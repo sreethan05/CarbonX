@@ -369,6 +369,9 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             reasons.append(f"Owner name '{profile.get('name')}' could not be verified in the land record text.")
         if not checks["ocr_available"]:
             reasons.append("OCR service is unavailable on the server.")
+        ndvi = checks.get("satellite_ndvi") or {}
+        if ndvi and float(ndvi.get("ndvi") or 0) < 0.15:
+            reasons.append("Satellite analysis indicates barren land (NDVI below 0.15).")
         status = "VERIFIED" if not reasons else "FLAGGED"
         record = {
             "owner_phone": phone,
@@ -380,6 +383,9 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
                 "village": data.village or profile.get("village", ""),
                 "district": data.district or profile.get("district", ""),
                 "area_acres": data.area_acres,
+                "ocr_text_preview": checks.get("ocr_text_preview", ""),
+                "geocoded_location": checks.get("geocoded_location"),
+                "satellite_ndvi": ndvi,
             },
             "document_name": data.document_name[:255],
             "document_sha256": checks["document_sha256"],

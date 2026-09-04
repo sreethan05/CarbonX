@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   FileText, ShieldCheck, ArrowRight, ArrowLeft, Upload, CheckCircle2, 
-  RefreshCw, Camera, AlertTriangle, Edit2, Check, Landmark 
+  RefreshCw, Camera, AlertTriangle, Edit2, Check 
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,20 +12,13 @@ import { verifyLandDocument } from '../services/api';
 export default function FarmOwnershipVerification() {
   const navigate = useNavigate();
   const { currentLang } = useLanguage();
-  
   // Custom multi-lingual dictionary just for this page's specialized text
   const pgTrans = {
     en: {
       title: "Farm Ownership Verification",
-      subtitle: "Verify your land deed, identity and bank account under real-world ESG compliance codes.",
-      aadhaarCard: "Aadhaar Card Verification",
-      aadhaarDesc: "Front + Back copy for Aadhaar KYC match.",
+      subtitle: "Verify your land ownership deed and satellite records under real-world ESG compliance codes.",
       landProof: "Land Ownership Proof",
-      landDesc: "Pattadar passbook, survey report, or land revenue receipt.",
-      bankProof: "Bank Account & UPI Verification",
-      bankDesc: "Bank passbook, cancelled cheque, or instant UPI check.",
-      geoPhotos: "Optional Geo-Tagged Farm Images",
-      geoPhotosDesc: "Upload real-world crop pictures embedded with GPS coordinates.",
+      landDesc: "Pattadar passbook, survey report, 7/12 extract, or land revenue receipt.",
       dragDrop: "Drag & drop or tap to upload",
       captureCam: "Camera Capture",
       uploading: "Uploading and securing file...",
@@ -36,7 +29,6 @@ export default function FarmOwnershipVerification() {
       surveyNo: "Survey Number",
       village: "Village Name",
       area: "Registered Area",
-      aadhaarMatch: "Aadhaar UID Match Score",
       startAiScan: "Initiate AI & Geospatial Compliance Scan",
       scanning: "Analyzing compliance protocols...",
       aiMatch: "Identity Match",
@@ -55,15 +47,9 @@ export default function FarmOwnershipVerification() {
     },
     hi: {
       title: "कृषि भूमि स्वामित्व सत्यापन",
-      subtitle: "वास्तविक वैश्विक ईएसजी अनुपालन मानकों के तहत अपने भूमि दस्तावेज, पहचान और बैंक खाते को सत्यापित करें।",
-      aadhaarCard: "आधार कार्ड सत्यापन",
-      aadhaarDesc: "आधार केवाईसी मिलान के लिए आगे और पीछे की प्रति।",
+      subtitle: "वास्तविक वैश्विक ईएसजी अनुपालन मानकों के तहत अपने भूमि दस्तावेज और उपग्रह रिकॉर्ड को सत्यापित करें।",
       landProof: "भूमि स्वामित्व का प्रमाण",
-      landDesc: "पट्टादार पासबुक, भूमि सर्वेक्षण रिपोर्ट, या राजस्व रसीद।",
-      bankProof: "बैंक खाता और यूपीआई सत्यापन",
-      bankDesc: "बैंक पासबुक, रद्द चेक, या तत्काल यूपीआई सत्यापन।",
-      geoPhotos: "वैकल्पिक जियो-टैग की गई तस्वीरें",
-      geoPhotosDesc: "जीपीएस निर्देशांक से लैस वास्तविक फसल की तस्वीरें अपलोड करें।",
+      landDesc: "पट्टादार पासबुक, 7/12 खसरा, भूमि सर्वेक्षण रिपोर्ट, या राजस्व रसीद।",
       dragDrop: "खींचे और छोड़ें या अपलोड करने के लिए टैप करें",
       captureCam: "कैमरा से फोटो लें",
       uploading: "फाइल अपलोड और सुरक्षित की जा रही है...",
@@ -74,7 +60,6 @@ export default function FarmOwnershipVerification() {
       surveyNo: "सर्वेक्षण संख्या (खसरा)",
       village: "गाँव का नाम",
       area: "पंजीकृत क्षेत्रफल",
-      aadhaarMatch: "आधार यूआईडी मिलान स्कोर",
       startAiScan: "एआई और भू-स्थानिक अनुपालन स्कैन शुरू करें",
       scanning: "अनुपालन प्रोटोकॉल का विश्लेषण किया जा रहा है...",
       aiMatch: "पहचान मिलान",
@@ -93,15 +78,9 @@ export default function FarmOwnershipVerification() {
     },
     te: {
       title: "వ్యవసాయ భూమి యాజమాన్య ధృవీకరణ",
-      subtitle: "నిజ-ప్రపంచ ESG సమ్మతి నియమాల ప్రకారం మీ భూమి పత్రం, గుర్తింపు మరియు బ్యాంక్ ఖాతాను ధృవీకరించండి.",
-      aadhaarCard: "ఆధార్ కార్డ్ ధృవీకరణ",
-      aadhaarDesc: "ఆధార్ KYC మ్యాచ్ కోసం ముందు + వెనుక కాపీ.",
+      subtitle: "నిజ-ప్రపంచ ESG సమ్మతి నియమాల ప్రకారం మీ భూమి పత్రం మరియు ఉపగ్రహ రికార్డులను ధృవీకరించండి.",
       landProof: "భూమి యాజమాన్య రుజువు",
       landDesc: "పట్టాదార్ పాస్‌బుక్, సర్వే రిపోర్ట్ లేదా ల్యాండ్ రెవెన్యూ రసీదు.",
-      bankProof: "బ్యాంక్ ఖాతా & UPI ధృవీకరణ",
-      bankDesc: "బ్యాంక్ పాస్‌బుక్, క్యాన్సిల్డ్ చెక్ లేదా తక్షణ UPI చెక్.",
-      geoPhotos: "ఐచ్ఛిక జియో-ట్యాగ్డ్ పంట చిత్రాలు",
-      geoPhotosDesc: "GPS కోఆర్డినేట్‌లతో కూడిన పంట నిజ-సమయ చిత్రాలను అప్‌లోడ్ చేయండి.",
       dragDrop: "డ్రాగ్ & డ్రాప్ చేయండి లేదా అప్‌లోడ్ చేయడానికి నొక్కండి",
       captureCam: "కెమెరా క్యాప్చర్",
       uploading: "ఫైల్ అప్‌లోడ్ అవుతోంది...",
@@ -112,7 +91,6 @@ export default function FarmOwnershipVerification() {
       surveyNo: "సర్వే నంబర్",
       village: "గ్రామం పేరు",
       area: "నమోదిత వైశాల్యం",
-      aadhaarMatch: "ఆధార్ UID మ్యాచ్ స్కోరు",
       startAiScan: "AI & జియోస్పేషియల్ సమ్మతి స్కాన్ ప్రారంభించండి",
       scanning: "సమ్మతి ప్రోటోకాల్‌లను విశ్లేషిస్తోంది...",
       aiMatch: "గుర్తింపు సరిపోలిక",
@@ -135,10 +113,7 @@ export default function FarmOwnershipVerification() {
 
   // State managers
   const [uploads, setUploads] = useState({
-    aadhaar: { file: null, progress: 0, status: 'idle', name: '' },
     land: { file: null, progress: 0, status: 'idle', name: '' },
-    bank: { file: null, progress: 0, status: 'idle', name: '' },
-    farmPhotos: { file: null, progress: 0, status: 'idle', name: '' },
   });
   const landFileRef = useRef(null);
   const [landDocument, setLandDocument] = useState(null);
@@ -152,7 +127,6 @@ export default function FarmOwnershipVerification() {
     surveyNumber: '',
     village: '',
     area: '',
-    aadhaarMatch: '—',
   });
 
   useEffect(() => {
@@ -161,7 +135,6 @@ export default function FarmOwnershipVerification() {
       surveyNumber: '',
       village: user?.village || '',
       area: farms[0]?.area_hectares ? `${farms[0].area_hectares} Hectares` : '',
-      aadhaarMatch: user?.aadhaar_last4 ? `****${user.aadhaar_last4}` : '—',
     });
   }, [user, farms]);
 
@@ -195,32 +168,7 @@ export default function FarmOwnershipVerification() {
     ]);
   }, [currentLang]);
 
-  // Simulate file upload
-  const handleUploadSim = (docKey, mockName) => {
-    setUploads(prev => ({
-      ...prev,
-      [docKey]: { file: null, progress: 10, status: 'uploading', name: mockName }
-    }));
-
-    let progress = 10;
-    const interval = setInterval(() => {
-      progress += 20;
-      if (progress >= 100) {
-        clearInterval(interval);
-        setUploads(prev => ({
-          ...prev,
-          [docKey]: { file: 'mock_uri', progress: 100, status: 'completed', name: mockName }
-        }));
-      } else {
-        setUploads(prev => ({
-          ...prev,
-          [docKey]: { ...prev[docKey], progress }
-        }));
-      }
-    }, 250);
-  };
-
-  const handleResetUpload = (docKey) => {
+  const handleResetUpload = (docKey = 'land') => {
     setUploads(prev => ({
       ...prev,
       [docKey]: { file: null, progress: 0, status: 'idle', name: '' }
@@ -257,13 +205,8 @@ export default function FarmOwnershipVerification() {
 
   // Run through scanning sequence
   const startScanningSim = async () => {
-    if (uploads.aadhaar.status !== 'completed' || uploads.land.status !== 'completed' || uploads.bank.status !== 'completed') {
-      alert("Please upload at least Aadhaar, Land Ownership, and Bank credentials first!");
-      return;
-    }
-
-    if (!landDocument) {
-      setVerificationError('Upload a real land-record image before running the checks.');
+    if (!landDocument || uploads.land.status !== 'completed') {
+      setVerificationError('Please upload a land record document before running verification.');
       return;
     }
 
@@ -358,102 +301,49 @@ export default function FarmOwnershipVerification() {
         {/* Upload Columns */}
         <div className="space-y-4">
           
-          {/* Card 1: Aadhaar */}
-          <div className="bg-white border border-forest-100 rounded-[28px] p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-start">
-              <div className="space-y-0.5">
-                <h3 className="text-xs font-bold text-carbon-800 flex items-center gap-1.5">
-                  🪪 {localT.aadhaarCard}
-                </h3>
-                <p className="text-[10px] text-carbon-400">{localT.aadhaarDesc}</p>
-              </div>
-              {uploads.aadhaar.status === 'completed' && (
-                <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Locked</span>
-              )}
-            </div>
-
-            {uploads.aadhaar.status === 'idle' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => handleUploadSim('aadhaar', 'aadhaar_ramesh_kumar.jpg')}
-                  className="border border-dashed border-forest-200 hover:border-forest-400 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50/20 transition-all group"
-                >
-                  <Upload size={18} className="text-forest-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-semibold text-carbon-500">{localT.dragDrop}</span>
-                </button>
-                <button 
-                  onClick={() => handleUploadSim('aadhaar', 'camera_snap_aadhaar.jpg')}
-                  className="border border-forest-100 hover:border-forest-200 bg-forest-50/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50 transition-all group"
-                >
-                  <Camera size={18} className="text-forest-700" />
-                  <span className="text-[10px] font-semibold text-carbon-700">{localT.captureCam}</span>
-                </button>
-              </div>
-            ) : (
-              <div className="bg-forest-50/50 border border-forest-100 rounded-2xl p-3 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white border border-forest-100 rounded-xl flex items-center justify-center text-forest-700">
-                    <FileText size={18} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-carbon-800 truncate max-w-[150px]">{uploads.aadhaar.name}</p>
-                    <p className="text-[9px] text-carbon-400">
-                      {uploads.aadhaar.status === 'uploading' ? `${uploads.aadhaar.progress}%` : localT.uploadSuccess}
-                    </p>
-                  </div>
-                </div>
-                {uploads.aadhaar.status === 'uploading' ? (
-                  <div className="w-8 h-8 rounded-full border-2 border-forest-100 border-t-forest-700 animate-spin"></div>
-                ) : (
-                  <button onClick={() => handleResetUpload('aadhaar')} className="p-1.5 hover:bg-forest-100 rounded-lg text-rose-500 transition-colors">
-                    <RefreshCw size={14} />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card 2: Land Deed */}
-          <div className="bg-white border border-forest-100 rounded-[28px] p-5 shadow-sm space-y-4">
+          {/* Dedicated Land Ownership Document Card */}
+          <div className="bg-white border border-forest-100 rounded-[28px] p-6 shadow-sm space-y-5">
             <input ref={landFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLandFile} />
             <div className="flex justify-between items-start">
-              <div className="space-y-0.5">
-                <h3 className="text-xs font-bold text-carbon-800 flex items-center gap-1.5">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-carbon-800 flex items-center gap-2">
                   📜 {localT.landProof}
                 </h3>
-                <p className="text-[10px] text-carbon-400">{localT.landDesc}</p>
+                <p className="text-xs text-carbon-400">{localT.landDesc}</p>
               </div>
               {uploads.land.status === 'completed' && (
-                <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Locked</span>
+                <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">Ready</span>
               )}
             </div>
 
             {uploads.land.status === 'idle' ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3.5">
                 <button 
                   onClick={() => landFileRef.current?.click()}
-                  className="border border-dashed border-forest-200 hover:border-forest-400 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50/20 transition-all group"
+                  className="border-2 border-dashed border-forest-200 hover:border-forest-400 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50/20 transition-all group cursor-pointer"
                 >
-                  <Upload size={18} className="text-forest-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-semibold text-carbon-500">{localT.dragDrop}</span>
+                  <Upload size={22} className="text-forest-600 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-carbon-600">{localT.dragDrop}</span>
+                  <span className="text-[10px] text-carbon-400">JPG, PNG, WebP up to 8 MB</span>
                 </button>
                 <button 
                   onClick={() => landFileRef.current?.click()}
-                  className="border border-forest-100 hover:border-forest-200 bg-forest-50/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50 transition-all group"
+                  className="border border-forest-100 hover:border-forest-200 bg-forest-50/40 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50 transition-all group cursor-pointer"
                 >
-                  <Camera size={18} className="text-forest-700" />
-                  <span className="text-[10px] font-semibold text-carbon-700">{localT.captureCam}</span>
+                  <Camera size={22} className="text-forest-700 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-carbon-700">{localT.captureCam}</span>
+                  <span className="text-[10px] text-carbon-400">Camera capture photo</span>
                 </button>
               </div>
             ) : (
-              <div className="bg-forest-50/50 border border-forest-100 rounded-2xl p-3 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white border border-forest-100 rounded-xl flex items-center justify-center text-forest-700">
-                    <FileText size={18} />
+              <div className="bg-forest-50/50 border border-forest-100 rounded-2xl p-4 flex justify-between items-center">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 bg-white border border-forest-100 rounded-xl flex items-center justify-center text-forest-700 shadow-sm">
+                    <FileText size={22} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-carbon-800 truncate max-w-[150px]">{uploads.land.name}</p>
-                    <p className="text-[9px] text-carbon-400">
+                    <p className="text-xs font-bold text-carbon-800 truncate max-w-[200px]">{uploads.land.name}</p>
+                    <p className="text-[10px] text-emerald-600 font-medium">
                       {uploads.land.status === 'uploading' ? `${uploads.land.progress}%` : localT.uploadSuccess}
                     </p>
                   </div>
@@ -461,114 +351,25 @@ export default function FarmOwnershipVerification() {
                 {uploads.land.status === 'uploading' ? (
                   <div className="w-8 h-8 rounded-full border-2 border-forest-100 border-t-forest-700 animate-spin"></div>
                 ) : (
-                  <button onClick={() => handleResetUpload('land')} className="p-1.5 hover:bg-forest-100 rounded-lg text-rose-500 transition-colors">
-                    <RefreshCw size={14} />
+                  <button onClick={() => handleResetUpload('land')} className="p-2 hover:bg-forest-100 rounded-xl text-rose-500 transition-colors" title="Change Document">
+                    <RefreshCw size={16} />
                   </button>
                 )}
               </div>
             )}
-          </div>
 
-          {/* Card 3: Bank Account */}
-          <div className="bg-white border border-forest-100 rounded-[28px] p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-start">
-              <div className="space-y-0.5">
-                <h3 className="text-xs font-bold text-carbon-800 flex items-center gap-1.5">
-                  🏦 {localT.bankProof}
-                </h3>
-                <p className="text-[10px] text-carbon-400">{localT.bankDesc}</p>
-              </div>
-              {uploads.bank.status === 'completed' && (
-                <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Locked</span>
-              )}
+            {/* Document Guidelines & Accepted Records */}
+            <div className="bg-forest-50/40 border border-forest-100/60 rounded-2xl p-4 text-[11px] text-carbon-500 space-y-2">
+              <p className="font-semibold text-forest-800 flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-forest-600" />
+                Accepted Government Land Documents:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[10px] text-carbon-500">
+                <li>Pattadar Passbook / Dharani / MeeSeva Record</li>
+                <li>7/12 Extract / Khasra / Khatauni / Jamabandi</li>
+                <li>Registered Land Revenue Tax Receipt or Registered Deed</li>
+              </ul>
             </div>
-
-            {uploads.bank.status === 'idle' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => handleUploadSim('bank', 'cancelled_cheque.jpg')}
-                  className="border border-dashed border-forest-200 hover:border-forest-400 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50/20 transition-all group"
-                >
-                  <Upload size={18} className="text-forest-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-semibold text-carbon-500">{localT.dragDrop}</span>
-                </button>
-                <button 
-                  onClick={() => handleUploadSim('bank', 'upi_verification.jpg')}
-                  className="border border-forest-100 hover:border-forest-200 bg-forest-50/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50 transition-all group"
-                >
-                  <Landmark size={18} className="text-forest-700" />
-                  <span className="text-[10px] font-semibold text-carbon-700">Verify UPI VPA</span>
-                </button>
-              </div>
-            ) : (
-              <div className="bg-forest-50/50 border border-forest-100 rounded-2xl p-3 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white border border-forest-100 rounded-xl flex items-center justify-center text-forest-700">
-                    <FileText size={18} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-carbon-800 truncate max-w-[150px]">{uploads.bank.name}</p>
-                    <p className="text-[9px] text-carbon-400">
-                      {uploads.bank.status === 'uploading' ? `${uploads.bank.progress}%` : localT.uploadSuccess}
-                    </p>
-                  </div>
-                </div>
-                {uploads.bank.status === 'uploading' ? (
-                  <div className="w-8 h-8 rounded-full border-2 border-forest-100 border-t-forest-700 animate-spin"></div>
-                ) : (
-                  <button onClick={() => handleResetUpload('bank')} className="p-1.5 hover:bg-forest-100 rounded-lg text-rose-500 transition-colors">
-                    <RefreshCw size={14} />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card 4: Farm Images (Optional) */}
-          <div className="bg-white border border-forest-100 rounded-[28px] p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-start">
-              <div className="space-y-0.5">
-                <h3 className="text-xs font-bold text-carbon-800 flex items-center gap-1.5">
-                  📸 {localT.geoPhotos}
-                </h3>
-                <p className="text-[10px] text-carbon-400">{localT.geoPhotosDesc}</p>
-              </div>
-              {uploads.farmPhotos.status === 'completed' && (
-                <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Locked</span>
-              )}
-            </div>
-
-            {uploads.farmPhotos.status === 'idle' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => handleUploadSim('farmPhotos', 'geotagged_rice_field.jpg')}
-                  className="border border-dashed border-forest-200 hover:border-forest-400 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50/20 transition-all group"
-                >
-                  <Upload size={18} className="text-forest-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-semibold text-carbon-500">{localT.dragDrop}</span>
-                </button>
-                <button 
-                  onClick={() => handleUploadSim('farmPhotos', 'cam_rice_bund.jpg')}
-                  className="border border-forest-100 hover:border-forest-200 bg-forest-50/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50 transition-all group"
-                >
-                  <Camera size={18} className="text-forest-700" />
-                  <span className="text-[10px] font-semibold text-carbon-700">{localT.captureCam}</span>
-                </button>
-              </div>
-            ) : (
-              <div className="bg-forest-50/50 border border-forest-100 rounded-2xl p-3 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <img src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=150" alt="thumbnail" className="w-10 h-10 object-cover border border-forest-100 rounded-xl" />
-                  <div>
-                    <p className="text-[10px] font-bold text-carbon-800 truncate max-w-[150px]">{uploads.farmPhotos.name}</p>
-                    <p className="text-[9px] text-emerald-600 font-medium">📍 GPS: 17.9620° N, 79.5982° E</p>
-                  </div>
-                </div>
-                <button onClick={() => handleResetUpload('farmPhotos')} className="p-1.5 hover:bg-forest-100 rounded-lg text-rose-500 transition-colors">
-                  <RefreshCw size={14} />
-                </button>
-              </div>
-            )}
           </div>
 
         </div>
@@ -707,6 +508,7 @@ export default function FarmOwnershipVerification() {
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="font-semibold text-carbon-500">{localT.village}</span>
+
                 {isEditingOcr ? (
                   <input 
                     type="text" 
@@ -731,11 +533,6 @@ export default function FarmOwnershipVerification() {
                 ) : (
                   <span className="font-extrabold text-carbon-800">{ocrData.area}</span>
                 )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <span className="font-semibold text-carbon-500">{localT.aadhaarMatch}</span>
-                <span className="font-extrabold text-profit">{ocrData.aadhaarMatch}</span>
               </div>
             </div>
 

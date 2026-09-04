@@ -1,9 +1,35 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ArrowRight, ShieldCheck, Landmark, Globe, Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { sendOtp, registerUser } from '../services/api';
+
+// Mirrors the backend's Verhoeff checksum check so an invalid Aadhaar number
+// is caught on the Aadhaar step, rather than after the user enters their UPI ID.
+const isValidAadhaar = (value) => {
+  const number = value.replace(/\D/g, '');
+  if (number.length !== 12) return false;
+
+  const multiplication = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+    [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+    [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+    [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+    [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+  ];
+  const permutation = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+    [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+    [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+    [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+  ];
+
+  return number.split('').reverse().reduce(
+    (checksum, digit, index) => multiplication[checksum][permutation[index % 8][Number(digit)]],
+    0,
+  ) === 0;
+};
 
 export default function FarmerRegister() {
   const navigate = useNavigate();
@@ -80,6 +106,7 @@ export default function FarmerRegister() {
   const handleBasicDetails = (e) => {
     e.preventDefault();
     if (!name || !aadhaar) return setError("Please fill in your Name and Aadhaar");
+    if (!isValidAadhaar(aadhaar)) return setError("Enter a valid 12-digit Aadhaar number");
     setError("");
     setStep(4);
   };
@@ -94,10 +121,11 @@ export default function FarmerRegister() {
       if (res.success) {
         await login(res.token, res.user);
         if (res.user?.preferred_language) changeLanguage(res.user.preferred_language);
-        setStep(5);
+        navigate('/farm-verification');
       } else {
         setError(res.message || "Registration failed");
         if (res.message?.includes("OTP")) setStep(2);
+        if (res.message?.includes("Aadhaar")) setStep(3);
       }
     } catch {
       setError("Server error. Please try again.");
