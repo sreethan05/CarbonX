@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#FAF8F5] text-carbon-800 font-inter antialiased overflow-x-hidden;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(44, 94, 67, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(226, 155, 99, 0.06) 0px, transparent 50%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cpath d='M0 130c40-15 80-15 120 0M40 0c15 40 15 80 0 120M160 30c-40 15-60 15-120 0M120 160c-15-40-15-80 0-120' fill='none' stroke='%232C5E43' stroke-width='0.45' stroke-opacity='0.08'/%3E%3Cpath d='M20 40c40-20 80 10 120-10M0 100c30 15 60-15 90 20' fill='none' stroke='%23E29B63' stroke-width='0.35' stroke-opacity='0.06'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-manrope font-semibold tracking-tight;
+  }
+}
+
+/* Custom premium styles */
+.bg-forest-gradient {
+  background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #81C784 100%);
+}
+
+.bg-earth-glow {
+  background: radial-gradient(circle at center, rgba(129, 199, 132, 0.15) 0%, transparent 70%);
+}
+
+.text-gradient-green {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-forest-700 to-earth-light;
+}
+
+.premium-card {
+  @apply bg-white border border-forest-100/60 rounded-3xl shadow-card backdrop-blur-md transition-all duration-300;
+}
+
+.premium-card-hover {
+  @apply hover:shadow-premium hover:-translate-y-0.5 hover:border-forest-200/80 transition-all duration-300;
+}
+
+.glass-panel {
+  @apply bg-white/85 backdrop-blur-xl border border-white/60 shadow-lg;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-warm-white;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-forest-200 rounded-full hover:bg-forest-300 transition-colors;
+}
+
+/* Leaflet Overrides */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  background-color: #FAFAF5 !important;
+}
+
+.leaflet-bar {
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  background-color: #ffffff !apply;
+  border-bottom: 1px solid #F5F5E9 !important;
+  color: #263238 !important;
+  transition: all 0.2s;
+}
+
+.leaflet-bar a:hover {
+  background-color: #F1F8F3 !important;
+  color: #1B5E20 !important;
+}
+
+/* Satellite scanning animation */
+@keyframes scan-vertical {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
+  }
+}
+
+.animate-scan-line {
+  position: absolute;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(to right, transparent, #81C784, #4FC3F7, #81C784, transparent);
+  box-shadow: 0 0 15px #81C784, 0 0 5px #4FC3F7;
+  opacity: 0.8;
+  animation: scan-vertical 5s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 3s infinite ease-in-out;
+}
+
+/* Indian Fintech UPI styling classes */
+.upi-badge {
+  background: linear-gradient(135deg, #0288D1 0%, #00bcd4 100%);
+}
