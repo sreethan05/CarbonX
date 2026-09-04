@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   FileText, ShieldCheck, ArrowRight, ArrowLeft, Upload, CheckCircle2, 
-  RefreshCw, Camera, AlertTriangle, Eye, Edit2, Check, Landmark 
+  RefreshCw, Camera, AlertTriangle, Edit2, Check, Landmark 
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { verifyLandDocument } from '../services/api';
 
 export default function FarmOwnershipVerification() {
   const navigate = useNavigate();
-  const { currentLang, t } = useLanguage();
+  const { currentLang } = useLanguage();
   
   // Custom multi-lingual dictionary just for this page's specialized text
   const pgTrans = {
@@ -139,6 +140,10 @@ export default function FarmOwnershipVerification() {
     bank: { file: null, progress: 0, status: 'idle', name: '' },
     farmPhotos: { file: null, progress: 0, status: 'idle', name: '' },
   });
+  const landFileRef = useRef(null);
+  const [landDocument, setLandDocument] = useState(null);
+  const [verificationResult, setVerificationResult] = useState(null);
+  const [verificationError, setVerificationError] = useState('');
 
   const { user, farms } = useAuth();
 
@@ -220,21 +225,66 @@ export default function FarmOwnershipVerification() {
       ...prev,
       [docKey]: { file: null, progress: 0, status: 'idle', name: '' }
     }));
+    if (docKey === 'land') {
+      setLandDocument(null);
+      setVerificationResult(null);
+      if (landFileRef.current) landFileRef.current.value = '';
+    }
   };
 
+  const handleLandFile = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setVerificationError('Choose an image smaller than 8 MB.');
+      return;
+    }
+    setVerificationError('');
+    setVerificationResult(null);
+    setLandDocument(file);
+    setUploads(prev => ({
+      ...prev,
+      land: { file, progress: 100, status: 'completed', name: file.name },
+    }));
+  };
+
+  const readAsBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
   // Run through scanning sequence
-  const startScanningSim = () => {
+  const startScanningSim = async () => {
     if (uploads.aadhaar.status !== 'completed' || uploads.land.status !== 'completed' || uploads.bank.status !== 'completed') {
       alert("Please upload at least Aadhaar, Land Ownership, and Bank credentials first!");
       return;
     }
 
-    setIsScanning(true);
-    setScanIndex(0);
-    setComplianceStatus("Pending Review");
+    if (!landDocument) {
+      setVerificationError('Upload a real land-record image before running the checks.');
+      return;
+    }
 
-    // Reset scan step states
-    setScanSteps(prev => prev.map(s => ({ ...s, status: 'loading' })));
+    setVerificationError('');
+    setIsScanning(true);
+    try {
+      const result = await verifyLandDocument({
+        document_name: landDocument.name,
+        document_content_base64: await readAsBase64(landDocument),
+        survey_number: ocrData.surveyNumber,
+        village: ocrData.village,
+      });
+      if (!result.success) throw new Error(result.message || 'Verification request failed.');
+      setVerificationResult(result);
+      setScanIndex(0);
+      setComplianceStatus('Pending Review');
+      setScanSteps(prev => prev.map(step => ({ ...step, status: 'loading' })));
+    } catch (error) {
+      setIsScanning(false);
+      setVerificationError(error.message || 'Could not connect to the verification service.');
+    }
   };
 
   useEffect(() => {
@@ -253,11 +303,11 @@ export default function FarmOwnershipVerification() {
     } else {
       // Completed scanning!
       setIsScanning(false);
-      setComplianceStatus("AI Verified");
-      // Store in localStorage to pass document states down
-      localStorage.setItem('carbonx_farmer_docs_verified', 'true');
+      const verified = verificationResult?.status === 'VERIFIED';
+      setComplianceStatus(verified ? 'AI Verified' : 'Manual Review Required');
+      if (verified) localStorage.setItem('carbonx_farmer_docs_verified', 'true');
     }
-  }, [scanIndex, isScanning]);
+  }, [scanIndex, isScanning, scanSteps.length, verificationResult]);
 
   const saveOcrChanges = () => {
     setOcrData({ ...ocrEditFields });
@@ -365,6 +415,7 @@ export default function FarmOwnershipVerification() {
 
           {/* Card 2: Land Deed */}
           <div className="bg-white border border-forest-100 rounded-[28px] p-5 shadow-sm space-y-4">
+            <input ref={landFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLandFile} />
             <div className="flex justify-between items-start">
               <div className="space-y-0.5">
                 <h3 className="text-xs font-bold text-carbon-800 flex items-center gap-1.5">
@@ -380,14 +431,14 @@ export default function FarmOwnershipVerification() {
             {uploads.land.status === 'idle' ? (
               <div className="grid grid-cols-2 gap-3">
                 <button 
-                  onClick={() => handleUploadSim('land', 'pattadar_passbook_scan.pdf')}
+                  onClick={() => landFileRef.current?.click()}
                   className="border border-dashed border-forest-200 hover:border-forest-400 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50/20 transition-all group"
                 >
                   <Upload size={18} className="text-forest-600 group-hover:scale-110 transition-transform" />
                   <span className="text-[10px] font-semibold text-carbon-500">{localT.dragDrop}</span>
                 </button>
                 <button 
-                  onClick={() => handleUploadSim('land', 'survey_record_photo.jpg')}
+                  onClick={() => landFileRef.current?.click()}
                   className="border border-forest-100 hover:border-forest-200 bg-forest-50/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:bg-forest-50 transition-all group"
                 >
                   <Camera size={18} className="text-forest-700" />
@@ -539,8 +590,6 @@ export default function FarmOwnershipVerification() {
               {scanSteps.map((step, idx) => {
                 const isActive = isScanning && idx === scanIndex;
                 const isComplete = step.status === 'completed' || (!isScanning && scanIndex > idx);
-                const isIdle = step.status === 'idle' && !isScanning;
-                
                 return (
                   <div 
                     key={step.key}
@@ -595,6 +644,13 @@ export default function FarmOwnershipVerification() {
                 </>
               )}
             </button>
+            {verificationError && <p className="relative z-10 text-[10px] text-rose-300">{verificationError}</p>}
+            {verificationResult && (
+              <div className={`relative z-10 rounded-2xl border p-3 text-[10px] ${verificationResult.status === 'VERIFIED' ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-200' : 'border-amber-500/40 bg-amber-950/30 text-amber-100'}`}>
+                <p className="font-bold">{verificationResult.status === 'VERIFIED' ? 'VERIFIED' : 'FLAGGED'} — stored against your farmer profile.</p>
+                {verificationResult.reasons?.length > 0 && <ul className="mt-1 list-disc pl-4 space-y-0.5">{verificationResult.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
+              </div>
+            )}
           </div>
 
           {/* OCR Extracted Details Panel */}

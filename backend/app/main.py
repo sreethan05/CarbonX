@@ -19,6 +19,7 @@ import os
 from app.security import create_access_token, decode_token
 from app.phone_service import generate_otp, send_phone_otp
 from app import supabase_db as db
+from app.services.kyc_service import analyse_document, validate_aadhaar
 
 app = FastAPI(title="CarbonX API")
 
@@ -169,6 +170,16 @@ class CreateListingModel(BaseModel):
     tx_hash: Optional[str] = None
 
 
+class LandVerificationModel(BaseModel):
+    document_name: str
+    document_content_base64: str
+    extracted_text: Optional[str] = ""
+    survey_number: Optional[str] = ""
+    village: Optional[str] = ""
+    district: Optional[str] = ""
+    area_acres: Optional[float] = None
+
+
 def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -241,6 +252,8 @@ def send_otp(data: SendOtpModel):
 def register(data: RegisterModel):
     try:
         phone = data.phone.strip().replace(" ", "")
+        if not validate_aadhaar(data.aadhaar):
+            return {"success": False, "message": "Enter a valid 12-digit Aadhaar number"}
         if not _verify_otp(phone, data.otp):
             return {"success": False, "message": "Invalid or expired OTP"}
         existing = _get_user(phone)
@@ -320,6 +333,72 @@ def login(data: LoginOtpModel):
         raise
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@app.post("/verify-land")
+def verify_land_document(data: LandVerificationModel, current_user: dict = Depends(get_current_user)):
+    """Persist a transparent prototype KYC outcome for a logged-in farmer."""
+    try:
+        _require_database()
+        phone = current_user.get("phone")
+        profile = _get_user(phone)
+        if not profile:
+            raise HTTPException(status_code=404, detail="User not found")
+        village = data.village or profile.get("village", "")
+        district = data.district or profile.get("district", "")
+        state = profile.get("state", "")
+
+        checks = analyse_document(
+            data.document_content_base64,
+            data.document_name,
+            profile.get("name", ""),
+            data.extracted_text or "",
+            db.get_document_hashes(),
+            village=village,
+            district=district,
+            state=state,
+        )
+        reasons = []
+        if not checks["image_readable"]:
+            reasons.append("The uploaded file is not a readable image.")
+        if checks["duplicate_detected"]:
+            reasons.append("This document was already submitted.")
+        if not checks["keywords_valid"] and not data.survey_number:
+            reasons.append("No expected land-record keywords (e.g. patta, survey, khata) or survey number were found.")
+        if not checks["name_match"]:
+            reasons.append(f"Owner name '{profile.get('name')}' could not be verified in the land record text.")
+        if not checks["ocr_available"]:
+            reasons.append("OCR service is unavailable on the server.")
+        status = "VERIFIED" if not reasons else "FLAGGED"
+        record = {
+            "owner_phone": phone,
+            "status": status,
+            "reasons": reasons,
+            "checks": checks,
+            "extracted_fields": {
+                "survey_number": data.survey_number,
+                "village": data.village or profile.get("village", ""),
+                "district": data.district or profile.get("district", ""),
+                "area_acres": data.area_acres,
+            },
+            "document_name": data.document_name[:255],
+            "document_sha256": checks["document_sha256"],
+            "perceptual_hash": checks["perceptual_hash"] or None,
+        }
+        saved = db.insert_kyc_verification(record)
+        return {
+            "success": True,
+            "status": status,
+            "checks": checks,
+            "reasons": reasons,
+            "verification": saved,
+        }
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        return {"success": False, "message": str(exc)}
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
 
 
 @app.get("/me")
@@ -531,7 +610,7 @@ def place_bid(listing_id: str, current_user: dict = Depends(get_current_user)):
         return {"success": False, "message": str(e)}
 
 
-@app.post("/predict")
+@app.api_route("/predict", methods=["GET", "POST"])
 def predict(longitude: float, latitude: float):
     try:
         from app.services.ml_service import predict_biodiversity

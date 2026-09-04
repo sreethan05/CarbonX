@@ -70,6 +70,10 @@ export async function saveFarm(farm) {
   return post(`${PY}/save-farm`, { farm });
 }
 
+export async function verifyLandDocument(payload) {
+  return post(`${PY}/verify-land`, payload);
+}
+
 export async function predictBiodiversity(longitude, latitude) {
   const res = await fetch(
     `${PY}/predict?longitude=${longitude}&latitude=${latitude}`,

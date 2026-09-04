@@ -81,6 +81,23 @@ def update_profile(phone: str, fields: dict) -> Optional[dict]:
     return get_profile(phone)
 
 
+def get_document_hashes() -> list[str]:
+    sb = _client()
+    if not sb:
+        return []
+    res = sb.table("kyc_verifications").select("document_sha256").execute()
+    return [row["document_sha256"] for row in (res.data or []) if row.get("document_sha256")]
+
+
+def insert_kyc_verification(record: dict) -> Optional[dict]:
+    sb = _client()
+    if not sb:
+        return None
+    res = sb.table("kyc_verifications").insert(record).execute()
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
 def store_otp(phone: str, otp: str, expires_at: datetime) -> bool:
     sb = _client()
     if not sb:
