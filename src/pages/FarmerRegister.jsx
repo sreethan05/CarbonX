@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ArrowRight, ShieldCheck, Landmark, Globe, Loader2 } from 'lucide-react';
+import { 
+  ArrowLeft, CheckCircle2, ArrowRight, ShieldCheck, Landmark, 
+  Globe, Loader2, Phone, User, Check, AlertCircle, LogIn 
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { sendOtp, registerUser } from '../services/api';
 
-// Mirrors the backend's Verhoeff checksum check so an invalid Aadhaar number
-// is caught on the Aadhaar step, rather than after the user enters their UPI ID.
+// Verhoeff checksum algorithm for 12-digit Indian Aadhaar validation
 const isValidAadhaar = (value) => {
   const number = value.replace(/\D/g, '');
   if (number.length !== 12) return false;
@@ -36,15 +38,18 @@ export default function FarmerRegister() {
   const { t, changeLanguage, currentLang } = useLanguage();
   const { login } = useAuth();
 
+  // 3-step structured flow: 1 = Mobile & OTP, 2 = Profile & Land, 3 = UPI Payout
   const [step, setStep] = useState(1);
+  const [otpSent, setOtpSent] = useState(false);
   const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
   const [aadhaar, setAadhaar] = useState("");
-  const [otp, setOtp] = useState("");
   const [state, setState] = useState("Telangana");
   const [district, setDistrict] = useState("Warangal");
   const [village, setVillage] = useState("Venkateshwara Pally");
   const [upi, setUpi] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [devOtp, setDevOtp] = useState("");
@@ -53,7 +58,7 @@ export default function FarmerRegister() {
   const startResendTimer = () => {
     setResendTimer(30);
     const iv = setInterval(() => {
-      setResendTimer(t => {
+      setResendTimer((t) => {
         if (t <= 1) { clearInterval(iv); return 0; }
         return t - 1;
       });
@@ -63,34 +68,20 @@ export default function FarmerRegister() {
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError("");
-    if (phone.length !== 10) return setError("Enter a valid 10-digit phone number");
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) return setError("Please enter a valid 10-digit mobile number");
     setLoading(true);
     try {
-      const res = await sendOtp(phone);
+      const res = await sendOtp(cleanPhone);
       if (res.success) {
         setDevOtp(res.dev_otp || "");
-        setStep(2);
+        setOtpSent(true);
         startResendTimer();
       } else {
         setError(res.message || "Failed to send OTP");
       }
     } catch {
-      setError("Could not reach server. Make sure the backend is running.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    if (resendTimer > 0) return;
-    setLoading(true);
-    try {
-      const res = await sendOtp(phone);
-      if (res.success) {
-        setDevOtp(res.dev_otp || "");
-        startResendTimer();
-        setOtp("");
-      }
+      setError("Could not reach server. Please make sure the backend is running.");
     } finally {
       setLoading(false);
     }
@@ -98,251 +89,501 @@ export default function FarmerRegister() {
 
   const handleVerifyOtp = (e) => {
     e.preventDefault();
-    if (otp.length < 4) return setError("Enter the 6-digit OTP");
+    if (otp.length < 4) return setError("Please enter the 6-digit verification code");
     setError("");
-    setStep(3);
+    setStep(2);
+  };
+
+  const handleAutofillDevOtp = () => {
+    if (devOtp) {
+      setOtp(devOtp);
+    }
   };
 
   const handleBasicDetails = (e) => {
     e.preventDefault();
-    if (!name || !aadhaar) return setError("Please fill in your Name and Aadhaar");
-    if (!isValidAadhaar(aadhaar)) return setError("Enter a valid 12-digit Aadhaar number");
+    if (!name.trim()) return setError("Please enter your Full Name as per government records");
+    const cleanAadhaar = aadhaar.replace(/\D/g, '');
+    if (cleanAadhaar.length !== 12) return setError("Please enter a complete 12-digit Aadhaar number");
+    if (!isValidAadhaar(cleanAadhaar)) return setError("Invalid Aadhaar number checksum. Please recheck the 12 digits.");
+    if (!village.trim() || !district.trim() || !state.trim()) return setError("Please enter your State, District, and Village");
     setError("");
-    setStep(4);
+    setStep(3);
   };
 
   const handleBankDetails = async (e) => {
     e.preventDefault();
-    if (!upi) return setError("Please enter your UPI ID");
+    if (!upi.trim()) return setError("Please enter your UPI ID (e.g. yourname@oksbi or phone@paytm)");
+    if (!upi.includes('@')) return setError("Please enter a valid UPI format containing '@' (e.g. mobile@upi)");
     setError("");
     setLoading(true);
     try {
-      const res = await registerUser({ phone, otp, name, aadhaar, state, district, village, upi, preferred_language: currentLang });
+      const res = await registerUser({ 
+        phone: phone.replace(/\D/g, ''), 
+        otp, 
+        name: name.trim(), 
+        aadhaar: aadhaar.replace(/\D/g, ''), 
+        state: state.trim(), 
+        district: district.trim(), 
+        village: village.trim(), 
+        upi: upi.trim(), 
+        preferred_language: currentLang 
+      });
       if (res.success) {
         await login(res.token, res.user);
         if (res.user?.preferred_language) changeLanguage(res.user.preferred_language);
+        // Guide smoothly to Step 2 of farmer onboarding: Land Verification
         navigate('/farm-verification');
       } else {
         setError(res.message || "Registration failed");
-        if (res.message?.includes("OTP")) setStep(2);
-        if (res.message?.includes("Aadhaar")) setStep(3);
+        if (res.message?.includes("OTP")) {
+          setStep(1);
+          setOtpSent(true);
+        }
+        if (res.message?.includes("Aadhaar")) {
+          setStep(2);
+        }
       }
     } catch {
-      setError("Server error. Please try again.");
+      setError("Server error. Please verify backend connection and try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen relative flex flex-col justify-between font-inter text-carbon-800 overflow-hidden">
-      <div className="absolute inset-0 z-0 bg-cover bg-center filter brightness-[0.45] saturate-[1.1]"
-        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=1920')` }} />
-      <div className="absolute inset-0 z-0 bg-gradient-to-tr from-emerald-950/85 via-emerald-900/60 to-orange-950/40 backdrop-blur-[2px]" />
+  const isAadhaarValid = isValidAadhaar(aadhaar);
 
-      <header className="relative z-10 py-4 px-6 bg-white/10 backdrop-blur-md flex justify-between items-center border-b border-white/10">
+  return (
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-between font-inter text-carbon-800">
+      
+      {/* Top Header */}
+      <header className="py-3.5 px-4 md:px-8 bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-forest-100/60 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
-          <button onClick={() => step > 1 ? setStep(step - 1) : navigate('/role-selection')}
-            className="p-2.5 hover:bg-white/10 rounded-xl text-white transition-colors">
-            <ArrowLeft size={18} />
+          <button 
+            type="button" 
+            onClick={() => step > 1 ? setStep(step - 1) : navigate('/')} 
+            className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <ArrowLeft size={16} />
+            <span className="hidden sm:inline">{step > 1 ? "Previous Step" : "Back to Home"}</span>
           </button>
-          <span className="font-manrope font-bold text-sm text-white tracking-wide">{t('registerFarmProfile')}</span>
+          <div className="h-4 w-px bg-forest-200 hidden sm:block"></div>
+          <span 
+            className="font-manrope font-extrabold text-lg text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" 
+            onClick={() => navigate('/')}
+          >
+            🌱 CarbonX
+          </span>
         </div>
-        <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-2.5 py-1 text-xs text-white">
-          <Globe size={13} className="text-emerald-300" />
-          <select value={currentLang} onChange={e => changeLanguage(e.target.value)}
-            className="bg-transparent border-none outline-none text-xs font-bold text-white focus:ring-0 cursor-pointer">
-            <option value="en" className="text-carbon-800">English</option>
-            <option value="hi" className="text-carbon-800">हिन्दी (Hindi)</option>
-            <option value="te" className="text-carbon-800">తెలుగు (Telugu)</option>
-          </select>
+
+        {/* Language selector & quick login */}
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/farmer-login')}
+            className="text-xs font-bold text-forest-800 hover:text-forest-900 px-3 py-1.5 rounded-xl hover:bg-forest-50 transition-colors hidden sm:flex items-center gap-1"
+          >
+            <LogIn size={13} />
+            <span>Already Registered? Sign In</span>
+          </button>
+          
+          <div className="flex items-center gap-1 bg-forest-50/80 border border-forest-100 rounded-xl px-2.5 py-1 text-xs text-forest-900 font-semibold">
+            <Globe size={13} className="text-forest-700" />
+            <select 
+              value={currentLang} 
+              onChange={e => changeLanguage(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs font-bold text-forest-900 focus:ring-0 cursor-pointer"
+            >
+              <option value="en">English</option>
+              <option value="hi">हिन्दी (Hindi)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+            </select>
+          </div>
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 max-w-md mx-auto w-full px-4 py-8 flex flex-col justify-center">
-        <div className="flex gap-2 justify-center mb-8">
-          {[1,2,3,4,5].map(i => (
-            <span key={i} className={`h-1.5 rounded-full transition-all duration-300 ${step >= i ? 'bg-emerald-400 w-8 shadow-sm shadow-emerald-400/50' : 'bg-white/25 w-4'}`} />
-          ))}
+      {/* Main Form Container */}
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 md:py-10 flex flex-col justify-center">
+        
+        {/* Tab Switcher: Register vs Sign In */}
+        <div className="bg-forest-100/70 p-1 rounded-2xl flex gap-1 mb-6 border border-forest-200/50 shadow-inner">
+          <button 
+            type="button"
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold font-poppins transition-all bg-white text-forest-900 shadow-sm flex items-center justify-center gap-1.5"
+          >
+            <span>➕ Register New Farm</span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => navigate('/farmer-login')}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold font-poppins transition-all text-carbon-500 hover:text-forest-900 hover:bg-white/50 flex items-center justify-center gap-1.5"
+          >
+            <span>🌾 Existing Farmer Login</span>
+          </button>
         </div>
 
+        {/* 3-Step Progress Indicator */}
+        <div className="mb-6 bg-white border border-forest-100 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between text-[11px] font-bold mb-2.5">
+            <span className={step >= 1 ? "text-forest-800" : "text-carbon-400"}>1. Phone & OTP</span>
+            <span className={step >= 2 ? "text-forest-800" : "text-carbon-400"}>2. Farmer Profile</span>
+            <span className={step >= 3 ? "text-forest-800" : "text-carbon-400"}>3. UPI Direct Pay</span>
+          </div>
+          <div className="w-full bg-forest-100/80 h-2 rounded-full overflow-hidden flex">
+            <div 
+              className="bg-forest-700 h-full rounded-full transition-all duration-300"
+              style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Error Alert */}
         {error && (
-          <div className="mb-4 bg-red-900/80 border border-red-500/50 rounded-2xl px-4 py-2.5 text-xs text-red-200 text-center">
-            {error}
+          <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-3.5 text-xs text-rose-700 flex items-start gap-2.5">
+            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
 
-        {step === 1 && (
-          <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in duration-300">
-            <div>
-              <h2 className="text-xl font-bold font-poppins text-carbon-900">{t('verifyMobile')}</h2>
-              <p className="text-xs text-carbon-500 leading-normal mt-1">{t('verifyMobileDesc')}</p>
+        {/* Card */}
+        <div className="bg-white border border-forest-100 rounded-3xl p-6 sm:p-8 shadow-card space-y-6">
+          
+          {/* STEP 1: Mobile Number & OTP Verification */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="space-y-1">
+                <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-2xl flex items-center justify-center mb-2 border border-forest-100">
+                  <Phone size={20} />
+                </div>
+                <h1 className="text-xl font-bold font-manrope text-carbon-900">
+                  {otpSent ? "Verify Your Mobile Number" : "Enter Mobile Number"}
+                </h1>
+                <p className="text-xs text-carbon-500 leading-relaxed">
+                  {otpSent ? `Enter the 6-digit OTP sent via SMS to +91 ${phone}` : "We will send an SMS OTP to link your farmland profile securely."}
+                </p>
+              </div>
+
+              {!otpSent ? (
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">Mobile Number</label>
+                    <div className="flex bg-warm-white border border-forest-200 focus-within:border-forest-600 focus-within:ring-2 focus-within:ring-forest-100 rounded-2xl p-3 items-center transition-all shadow-inner">
+                      <div className="flex items-center gap-1.5 pr-2.5 border-r border-forest-200 mr-2.5 text-xs font-bold text-carbon-700">
+                        <span>🇮🇳</span>
+                        <span>+91</span>
+                      </div>
+                      <input 
+                        type="tel" 
+                        placeholder="98480 22334" 
+                        value={phone}
+                        onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        className="w-full text-sm font-semibold bg-transparent border-none outline-none focus:ring-0 text-carbon-900" 
+                        autoFocus
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">Preferred Language</label>
+                    <select 
+                      value={currentLang} 
+                      onChange={e => changeLanguage(e.target.value)}
+                      className="w-full bg-warm-white border border-forest-200 rounded-2xl p-3 text-xs font-semibold focus:ring-2 focus:ring-forest-100 focus:border-forest-600 shadow-inner cursor-pointer"
+                    >
+                      <option value="en">English</option>
+                      <option value="hi">हिन्दी (Hindi)</option>
+                      <option value="te">తెలుగు (Telugu)</option>
+                    </select>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                  >
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : (
+                      <>
+                        <span>Send OTP Verification Code</span>
+                        <ArrowRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                  {devOtp && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-900 flex justify-between items-center gap-2">
+                      <div>
+                        <span className="font-semibold block text-[11px]">Testing OTP Available:</span>
+                        <span className="font-mono font-black text-sm tracking-wider text-amber-800">{devOtp}</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={handleAutofillDevOtp}
+                        className="bg-amber-200/80 hover:bg-amber-300 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-colors cursor-pointer"
+                      >
+                        Autofill OTP
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">Enter 6-Digit OTP</label>
+                      <button 
+                        type="button" 
+                        className="text-[11px] font-bold text-forest-700 hover:underline" 
+                        onClick={() => { setOtpSent(false); setDevOtp(''); setOtp(''); }}
+                      >
+                        Change Number
+                      </button>
+                    </div>
+
+                    <input 
+                      type="text" 
+                      placeholder="••••••" 
+                      maxLength={6} 
+                      value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 focus:ring-2 focus:ring-forest-100 rounded-2xl p-3.5 text-center text-lg font-mono font-bold tracking-[0.4em] text-carbon-900 shadow-inner" 
+                      autoFocus
+                      required 
+                    />
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-carbon-400">Didn't receive code?</span>
+                    <button 
+                      type="button" 
+                      disabled={resendTimer > 0 || loading} 
+                      onClick={handleSendOtp}
+                      className="font-bold text-forest-800 hover:underline disabled:text-carbon-400 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
+                    </button>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Verify & Continue to Profile</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </form>
+              )}
             </div>
-            <form onSubmit={handleSendOtp} className="space-y-4">
+          )}
+
+          {/* STEP 2: Farmer & Land Details */}
+          {step === 2 && (
+            <form onSubmit={handleBasicDetails} className="space-y-5">
+              <div className="space-y-1">
+                <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-2xl flex items-center justify-center mb-2 border border-forest-100">
+                  <User size={20} />
+                </div>
+                <h1 className="text-xl font-bold font-manrope text-carbon-900">Farmer & Farmland Profile</h1>
+                <p className="text-xs text-carbon-500 leading-relaxed">
+                  Enter your details as recorded in your Patta passbook or 7/12 land revenue extract.
+                </p>
+              </div>
+
+              {/* Full Name */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('phone')}</label>
-                <div className="flex bg-warm-white border border-forest-100 rounded-2xl p-3 items-center shadow-inner">
-                  <span className="text-xs font-bold text-carbon-500 mr-2 border-r border-forest-100 pr-2">+91</span>
-                  <input type="tel" placeholder="Enter 10 digit number" value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-                    className="w-full text-xs font-semibold bg-transparent border-none outline-none focus:ring-0" required />
+                <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">
+                  Farmer Full Name (as on Land Records)
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Ramesh Kumar" 
+                  value={name} 
+                  onChange={e => setName(e.target.value)}
+                  className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 focus:ring-2 focus:ring-forest-100 rounded-2xl p-3 text-xs font-semibold shadow-inner" 
+                  required 
+                />
+              </div>
+
+              {/* Aadhaar Number with Instant Validation */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">
+                    12-Digit Aadhaar Number
+                  </label>
+                  {aadhaar.replace(/\D/g, '').length === 12 && (
+                    <span className={`text-[10px] font-bold flex items-center gap-1 ${isAadhaarValid ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {isAadhaarValid ? <><Check size={12} /> Valid Aadhaar</> : <><AlertCircle size={12} /> Invalid Checksum</>}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="XXXX XXXX XXXX" 
+                    maxLength={14}
+                    value={aadhaar}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/\D/g, '').slice(0, 12);
+                      const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ');
+                      setAadhaar(formatted);
+                    }}
+                    className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 focus:ring-2 focus:ring-forest-100 rounded-2xl p-3 text-xs font-mono font-bold tracking-wider pr-10 shadow-inner" 
+                    required 
+                  />
+                  <ShieldCheck size={18} className={`absolute right-3 top-3.5 ${isAadhaarValid ? 'text-emerald-600' : 'text-carbon-400'}`} />
+                </div>
+                <p className="text-[10px] text-carbon-400">Used strictly for land deed owner matching. Never shared with third parties.</p>
+              </div>
+
+              {/* Location: State, District, Village */}
+              <div className="space-y-3 pt-1 border-t border-forest-50">
+                <p className="text-xs font-bold text-carbon-800">Farmland Location</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-carbon-600">State</label>
+                    <input 
+                      type="text" 
+                      value={state} 
+                      onChange={e => setState(e.target.value)}
+                      className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 rounded-2xl p-2.5 text-xs font-semibold shadow-inner" 
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-carbon-600">District</label>
+                    <input 
+                      type="text" 
+                      value={district} 
+                      onChange={e => setDistrict(e.target.value)}
+                      className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 rounded-2xl p-2.5 text-xs font-semibold shadow-inner" 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-carbon-600">Village</label>
+                  <input 
+                    type="text" 
+                    value={village} 
+                    onChange={e => setVillage(e.target.value)}
+                    className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 rounded-2xl p-2.5 text-xs font-semibold shadow-inner" 
+                    required 
+                  />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('preferredLang')}</label>
-                <select value={currentLang} onChange={e => changeLanguage(e.target.value)}
-                  className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold focus:ring-0 focus:border-forest-400 shadow-sm cursor-pointer">
-                  <option value="en">English</option>
-                  <option value="hi">Hindi (हिन्दी)</option>
-                  <option value="te">Telugu (తెలుగు)</option>
-                </select>
-              </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-60">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <>{t('sendOtp')} <ArrowRight size={14} /></>}
-              </button>
-            </form>
-          </div>
-        )}
 
-        {step === 2 && (
-          <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in duration-300">
-            <div>
-              <h2 className="text-xl font-bold font-poppins text-carbon-900">{t('enterOtp')}</h2>
-              <p className="text-xs text-carbon-500 leading-normal mt-1">{t('smsSent')} {phone}</p>
-            </div>
-            {devOtp ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 text-xs text-amber-800 text-center font-mono">
-                Dev OTP (SMS unavailable): <span className="font-black text-amber-900 text-sm">{devOtp}</span>
-              </div>
-            ) : (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-2.5 text-xs text-emerald-800 text-center">
-                📱 {t('smsSent')} {phone}
-              </div>
-            )}
-            <form onSubmit={handleVerifyOtp} className="space-y-6">
-              <div className="flex justify-center gap-4">
-                {[0,1,2,3,4,5].map(i => (
-                  <input key={i} type="text" maxLength={1} value={otp[i] || ''}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (/^\d?$/.test(val)) {
-                        const next = otp.split('');
-                        next[i] = val;
-                        setOtp(next.join(''));
-                        if (val && i < 5) e.target.nextSibling?.focus();
-                      }
-                    }}
-                    className="w-10 h-12 bg-warm-white border border-forest-100 rounded-xl text-center text-lg font-bold text-carbon-800 focus:border-forest-400 focus:ring-0 shadow-inner" />
-                ))}
-              </div>
-              <div className="text-center">
-                <button type="button" onClick={handleResend} disabled={resendTimer > 0}
-                  className="text-xs font-semibold text-forest-700 hover:underline disabled:text-carbon-400">
-                  {resendTimer > 0 ? `${t('resendIn')} ${resendTimer}s` : t('resendOtp')}
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setStep(1)}
+                  className="px-5 py-4 border border-forest-200 text-carbon-700 hover:bg-forest-50 rounded-2xl text-xs font-bold transition-all"
+                >
+                  Back
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Continue to Payout Setup</span>
+                  <ArrowRight size={14} />
                 </button>
               </div>
-              <button type="submit"
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg">
-                {t('continue')}
-              </button>
             </form>
-          </div>
-        )}
+          )}
 
-        {step === 3 && (
-          <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in duration-300">
-            <div>
-              <h2 className="text-xl font-bold font-poppins text-carbon-900">{t('farmlandProfile')}</h2>
-              <p className="text-xs text-carbon-500 leading-normal mt-1">{t('aadhaarDesc')}</p>
-            </div>
-            <form onSubmit={handleBasicDetails} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('fullName')}</label>
-                <input type="text" placeholder="Ramesh Kumar" value={name} onChange={e => setName(e.target.value)}
-                  className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold focus:ring-0 shadow-inner" required />
+          {/* STEP 3: UPI Direct Payout Account */}
+          {step === 3 && (
+            <form onSubmit={handleBankDetails} className="space-y-6">
+              <div className="space-y-1">
+                <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-2xl flex items-center justify-center mb-2 border border-forest-100">
+                  <Landmark size={20} />
+                </div>
+                <h1 className="text-xl font-bold font-manrope text-carbon-900">Direct UPI Bank Payout</h1>
+                <p className="text-xs text-carbon-500 leading-relaxed">
+                  When corporate buyers buy your verified carbon credits, payments are credited straight to your bank via UPI.
+                </p>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('aadhaarNumber')}</label>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">Your UPI ID (VPA)</label>
                 <div className="relative">
-                  <input type="text" placeholder="XXXX-XXXX-XXXX" value={aadhaar}
-                    onChange={e => setAadhaar(e.target.value.replace(/\D/g,'').slice(0,12))}
-                    className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold pr-10 focus:ring-0 shadow-inner" required />
-                  <ShieldCheck size={18} className="absolute right-3 top-3.5 text-forest-600" />
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 9848022334@upi or name@oksbi" 
+                    value={upi} 
+                    onChange={e => setUpi(e.target.value)}
+                    className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 focus:ring-2 focus:ring-forest-100 rounded-2xl p-3.5 text-xs font-semibold pr-10 shadow-inner" 
+                    autoFocus
+                    required 
+                  />
+                  <Landmark size={18} className="absolute right-3.5 top-3.5 text-forest-600" />
                 </div>
+                <p className="text-[10px] text-carbon-400">Accepted formats: Google Pay, PhonePe, Paytm, BHIM, or any bank UPI handle.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('state')}</label>
-                  <input type="text" value={state} onChange={e => setState(e.target.value)}
-                    className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold focus:ring-0 shadow-inner" required />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('district')}</label>
-                  <input type="text" value={district} onChange={e => setDistrict(e.target.value)}
-                    className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold focus:ring-0 shadow-inner" required />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('village')}</label>
-                <input type="text" value={village} onChange={e => setVillage(e.target.value)}
-                  className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold focus:ring-0 shadow-inner" required />
-              </div>
-              <button type="submit"
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg">
-                {t('verifyAadhaar')}
-              </button>
-            </form>
-          </div>
-        )}
 
-        {step === 4 && (
-          <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in duration-300">
-            <div>
-              <h2 className="text-xl font-bold font-poppins text-carbon-900">{t('directBank')}</h2>
-              <p className="text-xs text-carbon-500 leading-normal mt-1">{t('bankDesc')}</p>
-            </div>
-            <form onSubmit={handleBankDetails} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('upiId')}</label>
-                <div className="relative">
-                  <input type="text" placeholder="example@oksbi" value={upi} onChange={e => setUpi(e.target.value)}
-                    className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-xs font-semibold pr-10 focus:ring-0 shadow-inner" required />
-                  <Landmark size={18} className="absolute right-3 top-3.5 text-forest-600" />
-                </div>
-                <p className="text-[10px] text-carbon-400 mt-1">{t('bankInfo')}</p>
+              {/* Instant settlement explanation card */}
+              <div className="p-4 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl text-xs text-emerald-900 space-y-2">
+                <p className="font-bold flex items-center gap-1.5 text-emerald-950">
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                  Zero Commission Direct Settlements:
+                </p>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  CarbonX operates with zero middleman deductions. 100% of the agreed corporate credit sale price will be transferred to your linked bank account.
+                </p>
               </div>
-              <div className="p-4 bg-forest-50 border border-forest-100/50 rounded-2xl text-[10px] text-forest-800 leading-normal">
-                {t('upiSecured')}
-              </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 disabled:opacity-60">
-                {loading ? <><Loader2 size={16} className="animate-spin" /> Creating Account...</> : t('linkAccount')}
-              </button>
-            </form>
-          </div>
-        )}
 
-        {step === 5 && (
-          <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl p-6 shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center text-forest-800 mx-auto">
-              <CheckCircle2 size={36} />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold font-poppins text-carbon-900">{t('profileVerified')}</h2>
-              <p className="text-xs text-carbon-500 leading-relaxed px-4">{t('profileVerifiedDesc')}</p>
-            </div>
-            <button onClick={() => navigate('/onboarding')}
-              className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg transition-all">
-              {t('startTutorial')}
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setStep(2)}
+                  className="px-5 py-4 border border-forest-200 text-carbon-700 hover:bg-forest-50 rounded-2xl text-xs font-bold transition-all"
+                >
+                  Back
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="flex-1 bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {loading ? (
+                    <><Loader2 size={16} className="animate-spin" /> Creating Account & Profile...</>
+                  ) : (
+                    <>
+                      <span>Complete Registration & Verify Land</span>
+                      <ArrowRight size={14} />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Already registered prompt */}
+          <div className="pt-4 border-t border-forest-50 text-center space-y-1.5">
+            <p className="text-xs text-carbon-500">Already have a registered CarbonX account?</p>
+            <button 
+              type="button" 
+              onClick={() => navigate('/farmer-login')}
+              className="text-xs font-bold text-forest-800 hover:underline"
+            >
+              Sign In to Your Farmer Profile →
             </button>
           </div>
-        )}
+
+        </div>
+
+        {/* Support Help */}
+        <div className="mt-8 text-center text-xs text-carbon-500 space-y-1">
+          <p>Need assistance with your land records? Call our farmer helpline at <strong>1800-420-2026</strong> (Toll-Free).</p>
+        </div>
+
       </main>
 
-      <footer className="relative z-10 py-4 text-center text-[9px] text-white/80 border-t border-white/10 bg-black/20 backdrop-blur-sm">
-        🔒 SSL Secured Encrypted Aadhaar & UPI Verification Public Infrastructure
+      {/* Footer */}
+      <footer className="py-4 px-6 text-center text-xs text-carbon-400 border-t border-forest-100/60 bg-white/60 backdrop-blur-sm">
+        🔒 256-Bit SSL Encrypted Public Infrastructure • Ministry of Agriculture Aligned
       </footer>
+
     </div>
   );
 }

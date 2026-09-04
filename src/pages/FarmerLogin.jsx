@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Globe, HelpCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Globe, HelpCircle, Loader2, Phone, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { sendLoginOtp, loginUser } from '../services/api';
@@ -34,20 +34,20 @@ export default function FarmerLogin() {
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError('');
-    if (phone.replace(/\D/g, '').length !== 10) return setError(t('invalidPhone'));
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) return setError(t('invalidPhone') || "Enter a valid 10-digit mobile number");
     setLoading(true);
     try {
-      const cleanPhone = phone.replace(/\D/g, '');
       const res = await sendLoginOtp(cleanPhone);
       if (res.success) {
         setDevOtp(res.dev_otp || '');
         setOtpSent(true);
         startResendTimer();
       } else {
-        setError(res.message || t('otpFailed'));
+        setError(res.message || t('otpFailed') || "Failed to send OTP");
       }
     } catch {
-      setError(t('backendDown'));
+      setError(t('backendDown') || "Could not reach server. Please ensure backend is running.");
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export default function FarmerLogin() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    if (otp.length < 6) return setError(t('enterOtp6'));
+    if (otp.length < 4) return setError(t('enterOtp6') || "Enter the complete OTP code");
     setLoading(true);
     try {
       const cleanPhone = phone.replace(/\D/g, '');
@@ -66,112 +66,254 @@ export default function FarmerLogin() {
         if (res.user?.preferred_language) changeLanguage(res.user.preferred_language);
         navigate('/farmer-dashboard');
       } else {
-        setError(res.message || t('serverError'));
+        setError(res.message || t('serverError') || "Invalid OTP or login failed");
       }
     } catch {
-      setError(t('serverError'));
+      setError(t('serverError') || "Connection error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen relative flex flex-col justify-between font-inter text-carbon-800 overflow-hidden">
-      <div className="absolute inset-0 z-0 bg-cover bg-center filter brightness-[0.45] saturate-[1.1]"
-        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=1920')` }} />
-      <div className="absolute inset-0 z-0 bg-gradient-to-tr from-emerald-950/85 via-emerald-900/60 to-orange-950/40 backdrop-blur-[2px]" />
+  const handleAutofillDevOtp = () => {
+    if (devOtp) {
+      setOtp(devOtp);
+    }
+  };
 
-      <header className="relative z-10 py-4 px-6 bg-white/10 backdrop-blur-md flex justify-between items-center border-b border-white/10">
-        <button type="button" onClick={() => navigate('/role-selection')} className="p-2.5 hover:bg-white/10 rounded-xl text-white transition-colors">
-          <ArrowLeft size={18} />
-        </button>
-        <span className="font-manrope font-bold text-sm text-white tracking-wide">{t('farmerRole')} — {t('loginBtn')}</span>
-        <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-2.5 py-1 text-xs text-white">
-          <Globe size={13} className="text-emerald-300" />
-          <select value={currentLang} onChange={(e) => changeLanguage(e.target.value)}
-            className="bg-transparent border-none outline-none text-xs font-bold text-white focus:ring-0 cursor-pointer">
-            <option value="en" className="text-carbon-800">English</option>
-            <option value="hi" className="text-carbon-800">हिन्दी</option>
-            <option value="te" className="text-carbon-800">తెలుగు</option>
-          </select>
+  return (
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-between font-inter text-carbon-800">
+      {/* Top Header */}
+      <header className="py-3.5 px-4 md:px-8 bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-forest-100/60 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button" 
+            onClick={() => navigate('/')} 
+            className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <ArrowLeft size={16} />
+            <span className="hidden sm:inline">Back to Home</span>
+          </button>
+          <div className="h-4 w-px bg-forest-200 hidden sm:block"></div>
+          <span 
+            className="font-manrope font-extrabold text-lg text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" 
+            onClick={() => navigate('/')}
+          >
+            🌱 CarbonX
+          </span>
+        </div>
+
+        {/* Language selector */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-forest-50/80 border border-forest-100 rounded-xl px-2.5 py-1 text-xs text-forest-900 font-semibold">
+            <Globe size={13} className="text-forest-700" />
+            <select 
+              value={currentLang} 
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs font-bold text-forest-900 focus:ring-0 cursor-pointer"
+            >
+              <option value="en">English</option>
+              <option value="hi">हिन्दी (Hindi)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+            </select>
+          </div>
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 max-w-sm mx-auto w-full px-4 py-8 flex flex-col justify-center">
-        {error && (
-          <div className="mb-4 bg-red-900/80 border border-red-500/50 rounded-2xl px-4 py-2.5 text-xs text-red-200 text-center">{error}</div>
-        )}
+      {/* Main Container */}
+      <main className="flex-1 max-w-md mx-auto w-full px-4 py-8 md:py-12 flex flex-col justify-center">
+        
+        {/* Tab Switcher: Sign In vs Register */}
+        <div className="bg-forest-100/70 p-1 rounded-2xl flex gap-1 mb-6 border border-forest-200/50 shadow-inner">
+          <button 
+            type="button"
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold font-poppins transition-all bg-white text-forest-900 shadow-sm flex items-center justify-center gap-1.5"
+          >
+            <span>🌾 Existing Farmer Login</span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => navigate('/farmer-register')}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold font-poppins transition-all text-carbon-500 hover:text-forest-900 hover:bg-white/50 flex items-center justify-center gap-1.5"
+          >
+            <span>➕ Register New Farm</span>
+          </button>
+        </div>
 
-        <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl p-6 shadow-2xl space-y-6">
-          <div>
-            <h2 className="text-xl font-bold font-poppins text-carbon-900">{t('loginWelcome')}</h2>
-            <p className="text-xs text-carbon-500 leading-normal mt-1">{t('loginDesc')}</p>
+        {/* Card */}
+        <div className="bg-white border border-forest-100 rounded-3xl p-6 sm:p-8 shadow-card space-y-6">
+          
+          <div className="space-y-1.5">
+            <div className="w-11 h-11 bg-forest-50 text-forest-700 rounded-2xl flex items-center justify-center mb-3 border border-forest-100">
+              <Phone size={22} />
+            </div>
+            <h1 className="text-2xl font-extrabold font-manrope text-carbon-900 tracking-tight">
+              {t('loginWelcome') || "Farmer Sign In"}
+            </h1>
+            <p className="text-xs text-carbon-500 leading-relaxed">
+              {t('loginDesc') || "Enter your registered mobile number to access your farmland records, carbon credits, and payouts."}
+            </p>
           </div>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-xs text-rose-700 flex items-start gap-2">
+              <span className="font-bold">⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
 
           {!otpSent ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('registeredPhone')}</label>
-                <div className="flex bg-warm-white border border-forest-100 rounded-2xl p-3 items-center shadow-inner">
-                  <span className="text-xs font-bold text-carbon-500 mr-2 border-r border-forest-100 pr-2">+91</span>
-                  <input type="tel" placeholder="98480 22334" value={phone}
+                <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">
+                  {t('registeredPhone') || "Registered Mobile Number"}
+                </label>
+                <div className="flex bg-warm-white border border-forest-200 focus-within:border-forest-600 focus-within:ring-2 focus-within:ring-forest-100 rounded-2xl p-3 items-center transition-all shadow-inner">
+                  <div className="flex items-center gap-1.5 pr-2.5 border-r border-forest-200 mr-2.5 text-xs font-bold text-carbon-700">
+                    <span>🇮🇳</span>
+                    <span>+91</span>
+                  </div>
+                  <input 
+                    type="tel" 
+                    placeholder="98480 22334" 
+                    value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    className="w-full text-xs font-semibold bg-transparent border-none outline-none focus:ring-0" required />
+                    className="w-full text-sm font-semibold bg-transparent border-none outline-none focus:ring-0 text-carbon-900 placeholder:text-carbon-300" 
+                    autoFocus
+                    required 
+                  />
                 </div>
+                <p className="text-[10px] text-carbon-400">We will send a 6-digit OTP code to verify your identity.</p>
               </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-60">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <>{t('sendOtp')} <ArrowRight size={14} /></>}
+
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : (
+                  <>
+                    <span>{t('sendOtp') || "Send Verification OTP"}</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-5">
+              
+              {/* Dev OTP Helper */}
               {devOtp ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2 text-xs text-amber-800 text-center font-mono">
-                  Dev OTP (SMS unavailable): <span className="font-black text-amber-900">{devOtp}</span>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-900 flex justify-between items-center gap-2">
+                  <div>
+                    <span className="font-semibold block text-[11px]">Testing OTP Available:</span>
+                    <span className="font-mono font-black text-sm tracking-wider text-amber-800">{devOtp}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={handleAutofillDevOtp}
+                    className="bg-amber-200/80 hover:bg-amber-300 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    Autofill OTP
+                  </button>
                 </div>
               ) : (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-2 text-xs text-emerald-800 text-center">
-                  📱 {t('smsSent')} {phone}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-xs text-emerald-800 flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>OTP sent via SMS to <strong>+91 {phone}</strong></span>
                 </div>
               )}
+
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-carbon-500 uppercase tracking-wide">{t('enterOtp6')}</label>
-                <input type="text" placeholder="••••••" maxLength={6} value={otp}
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">
+                    {t('enterOtp6') || "Enter 6-Digit OTP"}
+                  </label>
+                  <button 
+                    type="button" 
+                    className="text-[11px] font-bold text-forest-700 hover:underline cursor-pointer" 
+                    onClick={() => { setOtpSent(false); setDevOtp(''); setOtp(''); }}
+                  >
+                    Change Number
+                  </button>
+                </div>
+
+                <input 
+                  type="text" 
+                  placeholder="••••••" 
+                  maxLength={6} 
+                  value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-warm-white border border-forest-100 rounded-2xl p-3 text-center text-sm font-bold tracking-widest focus:ring-0 focus:border-forest-400 shadow-inner" required />
+                  className="w-full bg-warm-white border border-forest-200 focus:border-forest-600 focus:ring-2 focus:ring-forest-100 rounded-2xl p-3.5 text-center text-lg font-mono font-bold tracking-[0.4em] text-carbon-900 shadow-inner" 
+                  autoFocus
+                  required 
+                />
               </div>
-              <div className="flex justify-between text-[10px]">
-                <button type="button" className="font-bold text-forest-700 hover:underline" onClick={() => { setOtpSent(false); setDevOtp(''); setOtp(''); }}>
-                  {t('changePhone')}
-                </button>
-                <button type="button" disabled={resendTimer > 0} onClick={handleSendOtp}
-                  className="font-bold text-forest-700 hover:underline disabled:text-carbon-400">
-                  {resendTimer > 0 ? `${t('resendIn')} ${resendTimer}s` : t('resendOtp')}
+
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-carbon-400">Didn't receive the code?</span>
+                <button 
+                  type="button" 
+                  disabled={resendTimer > 0 || loading} 
+                  onClick={handleSendOtp}
+                  className="font-bold text-forest-800 hover:underline disabled:text-carbon-400 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
                 </button>
               </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-60">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <>{t('loginBtn')} <ArrowRight size={14} /></>}
+
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : (
+                  <>
+                    <span>Verify & Enter Dashboard</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
               </button>
             </form>
           )}
+
+          <div className="pt-4 border-t border-forest-50 text-center space-y-2">
+            <p className="text-xs text-carbon-500">First time registering your farmland on CarbonX?</p>
+            <button 
+              type="button" 
+              onClick={() => navigate('/farmer-register')}
+              className="w-full py-3 bg-forest-50 hover:bg-forest-100 text-forest-800 border border-forest-100 rounded-2xl text-xs font-bold font-poppins transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Register New Farm Profile</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+
         </div>
 
-        <div className="mt-8 text-center space-y-1.5 text-xs bg-black/35 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-white shadow-lg">
-          <p className="text-white/80">{t('firstTime')}</p>
-          <button type="button" onClick={() => navigate('/farmer-register')} className="font-bold text-emerald-300 hover:text-emerald-200 hover:underline">
-            {t('registerFarmProfile')}
-          </button>
+        {/* Trust Badges */}
+        <div className="mt-8 text-center space-y-2">
+          <div className="flex justify-center items-center gap-4 text-[11px] text-carbon-500 font-medium">
+            <span className="flex items-center gap-1">🔒 256-bit Encrypted</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">🇮🇳 DPI Compliant</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">🌿 Direct UPI Payouts</span>
+          </div>
         </div>
+
       </main>
 
-      <footer className="relative z-10 py-4 flex justify-center items-center gap-4 text-[10px] text-white/80 border-t border-white/10 bg-black/20 backdrop-blur-sm">
-        <span className="flex items-center gap-1">📞 {t('helpline')}: 1800-420-2026</span>
-        <span>•</span>
-        <span className="flex items-center gap-1 hover:underline cursor-pointer" onClick={() => navigate('/support')}>
-          <HelpCircle size={12} /> {t('liveChat')}
-        </span>
+      {/* Footer */}
+      <footer className="py-4 px-6 text-center text-xs text-carbon-400 border-t border-forest-100/60 bg-white/60 backdrop-blur-sm flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4">
+        <span>📞 Farmer Helpline: <strong>1800-420-2026</strong> (Toll-Free)</span>
+        <span className="hidden sm:inline">•</span>
+        <button 
+          onClick={() => navigate('/support')} 
+          className="text-forest-700 hover:underline flex items-center gap-1 font-semibold"
+        >
+          <HelpCircle size={13} /> Need help? Chat with Support
+        </button>
       </footer>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Compass, ShoppingCart, Wallet, UserCheck, Menu, Bell, Globe, X, ChevronRight } from 'lucide-react';
+import { Home, Compass, ShoppingCart, Wallet, UserCheck, Menu, Bell, Globe, X, ChevronRight, ChevronDown, LogOut, LogIn } from 'lucide-react';
 import { mockFarmer } from '../data/mockData';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -41,9 +41,15 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, changeLanguage, currentLang } = useLanguage();
-  const { user } = useAuth();
+  const { user, logout, token } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showAllRoutes, setShowAllRoutes] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/farmer-login');
+  };
 
   const displayName = user?.name || mockFarmer.name;
   const displayVillage = [user?.village, user?.district].filter(Boolean).join(', ') || mockFarmer.village;
@@ -203,42 +209,74 @@ export default function Layout({ children }) {
             })}
           </nav>
 
-          {/* All pages grouped */}
-          <div className="pt-2 border-t border-forest-100/60 space-y-4">
-            {ALL_ROUTES.map((cat, ci) => (
-              <div key={ci}>
-                <p className="text-[10px] font-bold text-forest-600 uppercase tracking-wider mb-1.5 px-1">{cat.category}</p>
-                <div className="space-y-0.5">
-                  {cat.items.map((item, ii) => {
-                    const active = location.pathname === item.path;
-                    return (
-                      <button
-                        key={ii}
-                        onClick={() => navigate(item.path)}
-                        className={`w-full text-left py-1.5 px-3 rounded-xl text-xs font-medium flex items-center justify-between transition-all ${
-                          active ? 'bg-forest-100 text-forest-900' : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
-                        }`}
-                      >
-                        <span>{item.name}</span>
-                        {active && <ChevronRight size={12} className="text-forest-600" />}
-                      </button>
-                    );
-                  })}
-                </div>
+          {/* All pages collapsible section */}
+          <div className="pt-2 border-t border-forest-100/60 space-y-2">
+            <button 
+              onClick={() => setShowAllRoutes(!showAllRoutes)}
+              className="w-full flex items-center justify-between text-[11px] font-bold text-forest-700 uppercase tracking-wider py-1.5 px-1 hover:text-forest-900 transition-colors"
+            >
+              <span>Platform Directory</span>
+              <ChevronDown size={14} className={`transition-transform duration-200 ${showAllRoutes ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {showAllRoutes && (
+              <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                {ALL_ROUTES.map((cat, ci) => (
+                  <div key={ci}>
+                    <p className="text-[10px] font-bold text-carbon-400 uppercase tracking-wider mb-1 px-1">{cat.category}</p>
+                    <div className="space-y-0.5">
+                      {cat.items.map((item, ii) => {
+                        const active = location.pathname === item.path;
+                        return (
+                          <button
+                            key={ii}
+                            onClick={() => navigate(item.path)}
+                            className={`w-full text-left py-1.5 px-2.5 rounded-xl text-xs font-medium flex items-center justify-between transition-all ${
+                              active ? 'bg-forest-100 text-forest-900 font-bold' : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
+                            }`}
+                          >
+                            <span>{item.name}</span>
+                            {active && <ChevronRight size={12} className="text-forest-600" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
 
-        {/* Profile card */}
-        <div className="p-6 border-t border-forest-100/60 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden border border-forest-200 shadow-sm">
-            <ProfileAvatar className="w-full h-full" />
+        {/* Profile & Logout card */}
+        <div className="p-4 border-t border-forest-100/80 space-y-3 bg-forest-50/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-forest-200 shadow-sm shrink-0">
+              <ProfileAvatar className="w-full h-full" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-carbon-800 truncate leading-tight">{displayName}</p>
+              <p className="text-[10px] text-forest-600 truncate">{displayVillage}</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-carbon-800 truncate leading-tight">{displayName}</p>
-            <p className="text-xs text-forest-600 truncate">{displayVillage}</p>
-          </div>
+          
+          {token ? (
+            <button
+              onClick={handleLogout}
+              className="w-full py-2 px-3 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            >
+              <LogOut size={13} />
+              <span>Log Out</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/farmer-login')}
+              className="w-full py-2 px-3 rounded-xl bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            >
+              <LogIn size={13} />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -312,14 +350,34 @@ export default function Layout({ children }) {
               ))}
             </div>
 
-            <div className="px-5 py-4 border-t border-forest-100 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-forest-200">
-                <ProfileAvatar className="w-full h-full" />
+            <div className="px-5 py-4 border-t border-forest-100 space-y-3 bg-forest-50/20">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl overflow-hidden border border-forest-200 shrink-0">
+                  <ProfileAvatar className="w-full h-full" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
+                  <p className="text-[10px] text-forest-600 truncate">{displayVillage}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
-                <p className="text-[10px] text-forest-600 truncate">{displayVillage}</p>
-              </div>
+              
+              {token ? (
+                <button
+                  onClick={handleLogout}
+                  className="w-full py-2 px-3 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                >
+                  <LogOut size={13} />
+                  <span>Log Out</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => goTo('/farmer-login')}
+                  className="w-full py-2 px-3 rounded-xl bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                >
+                  <LogIn size={13} />
+                  <span>Sign In</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -9,19 +9,27 @@ export default function RoleSelection() {
     <div className="min-h-screen bg-warm-white flex flex-col justify-between font-inter text-carbon-800">
       
       {/* Top Header Bar */}
-      <header className="py-4 px-6 bg-white/50 backdrop-blur flex justify-between items-center border-b border-forest-100/50">
-        <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" onClick={() => navigate('/')}>
-          🌱 CarbonX
-        </span>
+      <header className="py-3 px-6 bg-white/80 backdrop-blur-md flex justify-between items-center border-b border-forest-100/60 sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-forest-100 hover:bg-forest-50 text-xs font-semibold rounded-xl text-carbon-700 transition-colors">
-            <Globe size={14} className="text-forest-600" />
-            <span>English</span>
-            <span className="text-[10px] text-carbon-400">▼</span>
+          <button 
+            onClick={() => navigate('/')} 
+            className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors flex items-center gap-1 text-xs font-semibold"
+            title="Back to Home"
+          >
+            <ArrowRight size={15} className="rotate-180" />
+            <span className="hidden sm:inline">Home</span>
           </button>
-          <div className="w-8 h-8 rounded-full bg-forest-800 text-white flex items-center justify-center font-bold text-sm">
-            R
-          </div>
+          <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" onClick={() => navigate('/')}>
+            🌱 CarbonX
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/farmer-login')}
+            className="text-xs font-bold text-forest-800 hover:text-forest-900 px-3 py-1.5 rounded-xl hover:bg-forest-50 transition-colors"
+          >
+            Farmer Login
+          </button>
         </div>
       </header>
 
@@ -55,12 +63,21 @@ export default function RoleSelection() {
                 </p>
               </div>
             </div>
-            <button 
-              onClick={() => navigate('/farmer-register')}
-              className="w-full bg-carbon-800 hover:bg-carbon-900 text-white text-xs font-bold font-poppins py-3.5 rounded-2xl shadow transition-all duration-200 flex items-center justify-center gap-2"
-            >
-              Get Started <ArrowRight size={14} />
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+              <button 
+                onClick={() => navigate('/farmer-register')}
+                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-3.5 rounded-2xl shadow transition-all duration-200 flex items-center justify-center gap-1.5"
+              >
+                <span>Register New Farm</span>
+                <ArrowRight size={14} />
+              </button>
+              <button 
+                onClick={() => navigate('/farmer-login')}
+                className="w-full border-2 border-forest-700 hover:bg-forest-50 text-forest-800 text-xs font-bold font-poppins py-3.5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5"
+              >
+                <span>Farmer Sign In</span>
+              </button>
+            </div>
           </div>
 
           {/* Corporate Buyer Card */}

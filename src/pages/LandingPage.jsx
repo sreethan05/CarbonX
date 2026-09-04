@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Compass, Wallet, Cpu, HeartHandshake, ArrowRight, CheckCircle2, ChevronDown } from 'lucide-react';
+import { ShieldCheck, Compass, Wallet, Cpu, HeartHandshake, ArrowRight, CheckCircle2, ChevronDown, LogIn } from 'lucide-react';
 import { getMarketplaceListings } from '../services/api';
 import { listingToAuction } from '../utils/farmAnalytics';
 
@@ -29,49 +29,83 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-warm-white font-inter">
       {/* Header bar */}
-      <header className="py-4 px-6 md:px-12 bg-white/75 backdrop-blur-md sticky top-0 z-40 border-b border-forest-50/50 flex justify-between items-center shadow-sm">
-        <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight flex items-center gap-1.5">
-          🌱 CarbonX
-        </span>
-        <div className="hidden md:flex gap-6 items-center text-sm font-semibold text-carbon-600">
-          <a href="#how-it-works" className="hover:text-forest-700 transition-colors">Scientific Pipeline</a>
+      <header className="py-3 px-4 md:px-10 bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-forest-100/60 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+          <span className="w-9 h-9 bg-forest-700 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm">🌱</span>
+          <div>
+            <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight block leading-tight">
+              CarbonX
+            </span>
+            <span className="text-[9px] font-semibold text-carbon-400 hidden sm:block">Verified Carbon Sequestration</span>
+          </div>
+        </div>
+
+        <div className="hidden lg:flex gap-6 items-center text-xs font-semibold text-carbon-600">
+          <a href="#how-it-works" className="hover:text-forest-700 transition-colors">How It Works</a>
           <a href="#marketplace" className="hover:text-forest-700 transition-colors">Live Market</a>
           <a href="#success" className="hover:text-forest-700 transition-colors">Farmer Success</a>
           <a href="#faq" className="hover:text-forest-700 transition-colors">FAQ</a>
         </div>
-        <button 
-          onClick={() => navigate('/role-selection')}
-          className="bg-forest-800 hover:bg-forest-900 text-white font-poppins text-xs font-bold px-5 py-2.5 rounded-2xl shadow transition-all duration-200"
-        >
-          Enter Platform
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => navigate('/farmer-login')}
+            className="text-forest-800 hover:text-forest-900 font-poppins text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-forest-50 transition-all flex items-center gap-1"
+          >
+            <LogIn size={14} />
+            <span>Sign In</span>
+          </button>
+          <button 
+            onClick={() => navigate('/farmer-register')}
+            className="bg-forest-800 hover:bg-forest-900 text-white font-poppins text-xs font-bold px-4 py-2 rounded-xl shadow transition-all duration-200"
+          >
+            Register Farm
+          </button>
+          <button 
+            onClick={() => navigate('/role-selection')}
+            className="hidden sm:block border border-forest-200 hover:bg-forest-50 text-forest-800 font-poppins text-xs font-semibold px-3 py-2 rounded-xl transition-all"
+            title="Choose Farmer, Corporate, or Partner portals"
+          >
+            Portals
+          </button>
+        </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative py-16 px-6 md:px-12 max-w-7xl mx-auto grid md:grid-cols-12 gap-12 items-center">
+      <section className="relative py-14 px-6 md:px-12 max-w-7xl mx-auto grid md:grid-cols-12 gap-12 items-center">
         {/* Animated Satellite grid backdrop */}
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#2E7D32_1.5px,transparent_1.5px)] [background-size:24px_24px] pointer-events-none"></div>
         
         <div className="md:col-span-7 space-y-6 relative z-10 text-center md:text-left">
           
-          <h1 className="text-4xl md:text-6xl font-extrabold font-manrope text-carbon-900 leading-tight">
+          <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200/80 text-emerald-800 px-3.5 py-1.5 rounded-full text-xs font-bold">
+            <span>🇮🇳 Direct Public Infrastructure for Indian Farmers</span>
+          </div>
+
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold font-manrope text-carbon-900 leading-tight">
             Turn Sustainable Farming into <span className="text-forest-800 underline decoration-earth-light decoration-4">Income</span>
           </h1>
           <p className="text-sm md:text-base text-carbon-600 leading-relaxed max-w-xl">
             Empowering Indian smallholder farmers to register farmland, receive AI/satellite-verified carbon credits, and sell directly to global corporate buyers with zero middleman commissions.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start pt-3">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start pt-2">
             <button 
-              onClick={() => navigate('/role-selection')}
-              className="bg-forest-800 hover:bg-forest-900 text-white text-sm font-bold font-poppins px-8 py-4 rounded-2xl shadow-lg hover:shadow-premium flex items-center justify-center gap-2 transition-all"
+              onClick={() => navigate('/farmer-register')}
+              className="bg-forest-800 hover:bg-forest-900 text-white text-sm font-bold font-poppins px-7 py-3.5 rounded-2xl shadow-lg hover:shadow-premium flex items-center justify-center gap-2 transition-all"
             >
               Register Your Farm <ArrowRight size={16} />
             </button>
             <button 
-              onClick={() => navigate('/corporate-welcome')}
-              className="border-2 border-forest-200 hover:border-forest-400 bg-white/50 text-forest-900 text-sm font-bold font-poppins px-8 py-4 rounded-2xl flex items-center justify-center transition-all"
+              onClick={() => navigate('/farmer-login')}
+              className="border-2 border-forest-700 bg-white text-forest-800 hover:bg-forest-50 text-sm font-bold font-poppins px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-sm"
             >
-              Explore Marketplace
+              <LogIn size={16} /> Existing Farmer Login
+            </button>
+            <button 
+              onClick={() => navigate('/corporate-welcome')}
+              className="border border-carbon-200 hover:border-forest-300 bg-white/70 text-carbon-700 hover:text-forest-900 text-xs font-bold font-poppins px-4 py-3.5 rounded-2xl flex items-center justify-center transition-all"
+            >
+              Corporate Buyer 🏢
             </button>
           </div>
         </div>

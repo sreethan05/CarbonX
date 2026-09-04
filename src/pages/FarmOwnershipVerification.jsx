@@ -296,10 +296,34 @@ export default function FarmOwnershipVerification() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <main className="max-w-4xl mx-auto px-4 mt-6 space-y-6">
         
-        {/* Upload Columns */}
-        <div className="space-y-4">
+        {/* Onboarding Journey Stepper */}
+        <div className="bg-white border border-forest-100 rounded-2xl p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between text-xs gap-2 mb-2.5">
+            <span className="font-bold text-forest-700 flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600" />
+              1. Profile & Aadhaar
+            </span>
+            <span className="font-bold text-forest-900 flex items-center gap-1.5 bg-forest-100 px-3 py-1 rounded-full border border-forest-200 shadow-sm">
+              <ShieldCheck size={15} className="text-forest-700" />
+              2. Land Verification (Current)
+            </span>
+            <span className="font-semibold text-carbon-400 flex items-center gap-1.5">
+              3. Satellite Boundary Map
+            </span>
+            <span className="font-semibold text-carbon-400 flex items-center gap-1.5">
+              4. Carbon Dashboard
+            </span>
+          </div>
+          <div className="w-full bg-forest-100 h-2 rounded-full overflow-hidden">
+            <div className="bg-forest-700 h-full rounded-full transition-all duration-500" style={{ width: '50%' }}></div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Upload Columns */}
+          <div className="space-y-4">
           
           {/* Dedicated Land Ownership Document Card */}
           <div className="bg-white border border-forest-100 rounded-[28px] p-6 shadow-sm space-y-5">
@@ -569,18 +593,31 @@ export default function FarmOwnershipVerification() {
             </div>
           </div>
 
-          {/* Continue button */}
+          {/* Continue / Next Steps buttons */}
           {(complianceStatus === "AI Verified" || complianceStatus === "Approved") && (
-            <motion.button
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              onClick={() => navigate('/verification-success')}
-              className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg transition-all duration-200 flex items-center justify-center gap-1.5"
+              className="space-y-2 pt-2"
             >
-              <span>{localT.continueSuccess}</span>
-              <ArrowRight size={14} />
-            </motion.button>
+              <button
+                onClick={() => navigate('/farm-map')}
+                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Proceed to Farmland Boundary Mapping (Step 3)</span>
+                <ArrowRight size={15} />
+              </button>
+
+              <button
+                onClick={() => navigate('/verification-success')}
+                className="w-full py-2.5 text-center text-xs font-semibold text-forest-700 hover:text-forest-900 hover:underline"
+              >
+                View Satellite Revisit Timeline
+              </button>
+            </motion.div>
           )}
+
+        </div>
 
         </div>
 

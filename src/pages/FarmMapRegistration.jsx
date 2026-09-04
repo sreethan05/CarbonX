@@ -140,10 +140,38 @@ export default function FarmMapRegistration() {
       </header>
 
       <main className="flex-1 p-4 max-w-4xl mx-auto w-full space-y-4">
-        <div className="bg-white border border-forest-100/60 p-4 rounded-2xl flex justify-between items-center gap-4 shadow-sm">
+        
+        {/* Onboarding Journey Stepper */}
+        <div className="bg-white border border-forest-100 rounded-2xl p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between text-xs gap-2 mb-2.5">
+            <span className="font-bold text-forest-700 flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600" />
+              1. Profile & Aadhaar
+            </span>
+            <span className="font-bold text-forest-700 flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600" />
+              2. Land Verification
+            </span>
+            <span className="font-bold text-forest-900 flex items-center gap-1.5 bg-forest-100 px-3 py-1 rounded-full border border-forest-200 shadow-sm">
+              <Compass size={15} className="text-forest-700" />
+              3. Boundary Mapping (Current)
+            </span>
+            <span className="font-semibold text-carbon-400 flex items-center gap-1.5">
+              4. Carbon Dashboard
+            </span>
+          </div>
+          <div className="w-full bg-forest-100 h-2 rounded-full overflow-hidden">
+            <div className="bg-forest-700 h-full rounded-full transition-all duration-500" style={{ width: '75%' }}></div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-forest-100/60 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
           <div>
             <h2 className="text-xs font-bold text-carbon-800">{t('geeMapTitle')}</h2>
-            <p className="text-[10px] text-carbon-400 mt-0.5">{mapDesc}</p>
+            <p className="text-[11px] text-carbon-500 mt-0.5">{mapDesc}</p>
+            <p className="text-[10px] text-forest-700 font-semibold mt-1">
+              💡 Tip: Click the polygon tool icon on the top-right of the map to draw your field boundary.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {drawnGeojson && !analysisResult && (
