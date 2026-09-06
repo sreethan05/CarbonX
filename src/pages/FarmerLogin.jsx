@@ -64,7 +64,7 @@ export default function FarmerLogin() {
       if (res.success) {
         await login(res.token, res.user);
         if (res.user?.preferred_language) changeLanguage(res.user.preferred_language);
-        navigate('/farmer-dashboard');
+        navigate('/dashboard');
       } else {
         setError(res.message || t('serverError') || "Invalid OTP or login failed");
       }
@@ -96,10 +96,10 @@ export default function FarmerLogin() {
           </button>
           <div className="h-4 w-px bg-forest-200 hidden sm:block"></div>
           <span 
-            className="font-manrope font-extrabold text-lg text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" 
+            className="font-manrope font-extrabold text-lg text-forest-800 tracking-tight cursor-pointer" 
             onClick={() => navigate('/')}
           >
-            🌱 CarbonX
+            CarbonX
           </span>
         </div>
 
@@ -123,20 +123,20 @@ export default function FarmerLogin() {
       {/* Main Container */}
       <main className="flex-1 max-w-md mx-auto w-full px-4 py-8 md:py-12 flex flex-col justify-center">
         
-        {/* Tab Switcher: Sign In vs Register */}
+        {/* Tab Switcher */}
         <div className="bg-forest-100/70 p-1 rounded-2xl flex gap-1 mb-6 border border-forest-200/50 shadow-inner">
           <button 
             type="button"
             className="flex-1 py-2.5 rounded-xl text-xs font-bold font-poppins transition-all bg-white text-forest-900 shadow-sm flex items-center justify-center gap-1.5"
           >
-            <span>🌾 Existing Farmer Login</span>
+            <span>Sign In</span>
           </button>
           <button 
             type="button"
             onClick={() => navigate('/farmer-register')}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold font-poppins transition-all text-carbon-500 hover:text-forest-900 hover:bg-white/50 flex items-center justify-center gap-1.5"
           >
-            <span>➕ Register New Farm</span>
+            <span>Register New Account</span>
           </button>
         </div>
 
@@ -148,16 +148,16 @@ export default function FarmerLogin() {
               <Phone size={22} />
             </div>
             <h1 className="text-2xl font-extrabold font-manrope text-carbon-900 tracking-tight">
-              {t('loginWelcome') || "Farmer Sign In"}
+              {t('loginWelcome') || "Welcome Back"}
             </h1>
             <p className="text-xs text-carbon-500 leading-relaxed">
-              {t('loginDesc') || "Enter your registered mobile number to access your farmland records, carbon credits, and payouts."}
+              {t('loginDesc') || "Enter your registered mobile number to access your dashboard."}
             </p>
           </div>
 
           {error && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-xs text-rose-700 flex items-start gap-2">
-              <span className="font-bold">⚠️</span>
+              <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -170,7 +170,6 @@ export default function FarmerLogin() {
                 </label>
                 <div className="flex bg-warm-white border border-forest-200 focus-within:border-forest-600 focus-within:ring-2 focus-within:ring-forest-100 rounded-2xl p-3 items-center transition-all shadow-inner">
                   <div className="flex items-center gap-1.5 pr-2.5 border-r border-forest-200 mr-2.5 text-xs font-bold text-carbon-700">
-                    <span>🇮🇳</span>
                     <span>+91</span>
                   </div>
                   <input 
@@ -240,7 +239,7 @@ export default function FarmerLogin() {
 
                 <input 
                   type="text" 
-                  placeholder="••••••" 
+                  placeholder="•••••••" 
                   maxLength={6} 
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
@@ -278,13 +277,13 @@ export default function FarmerLogin() {
           )}
 
           <div className="pt-4 border-t border-forest-50 text-center space-y-2">
-            <p className="text-xs text-carbon-500">First time registering your farmland on CarbonX?</p>
+            <p className="text-xs text-carbon-500">New to CarbonX?</p>
             <button 
               type="button" 
-              onClick={() => navigate('/farmer-register')}
+              onClick={() => navigate('/role-selection')}
               className="w-full py-3 bg-forest-50 hover:bg-forest-100 text-forest-800 border border-forest-100 rounded-2xl text-xs font-bold font-poppins transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span>Register New Farm Profile</span>
+              <span>Choose Your Role & Register</span>
               <ArrowRight size={13} />
             </button>
           </div>
@@ -294,11 +293,11 @@ export default function FarmerLogin() {
         {/* Trust Badges */}
         <div className="mt-8 text-center space-y-2">
           <div className="flex justify-center items-center gap-4 text-[11px] text-carbon-500 font-medium">
-            <span className="flex items-center gap-1">🔒 256-bit Encrypted</span>
+            <span className="flex items-center gap-1">256-bit Encrypted</span>
             <span>•</span>
-            <span className="flex items-center gap-1">🇮🇳 DPI Compliant</span>
+            <span className="flex items-center gap-1">DPI Compliant</span>
             <span>•</span>
-            <span className="flex items-center gap-1">🌿 Direct UPI Payouts</span>
+            <span className="flex items-center gap-1">Direct UPI Payouts</span>
           </div>
         </div>
 
@@ -306,7 +305,7 @@ export default function FarmerLogin() {
 
       {/* Footer */}
       <footer className="py-4 px-6 text-center text-xs text-carbon-400 border-t border-forest-100/60 bg-white/60 backdrop-blur-sm flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4">
-        <span>📞 Farmer Helpline: <strong>1800-420-2026</strong> (Toll-Free)</span>
+        <span>Farmer Helpline: <strong>1800-420-2026</strong> (Toll-Free)</span>
         <span className="hidden sm:inline">•</span>
         <button 
           onClick={() => navigate('/support')} 
