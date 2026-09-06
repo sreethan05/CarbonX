@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Satellite, Leaf, Wallet } from 'lucide-react';
 import { combinedCredits } from '../services/api';
 
 const CREDIT_PRICE = 520;
@@ -17,76 +17,57 @@ export default function SuccessScreen() {
   }, []);
 
   const credits = analysis ? combinedCredits(analysis).total : 0;
-  const area = analysis?.area_hectares ?? 0;
   const annualValue = Math.round(credits * CREDIT_PRICE);
 
   return (
-    <div className="min-h-screen bg-warm-white flex flex-col justify-between font-inter text-carbon-800">
-      <header className="py-4 px-6 bg-white/50 backdrop-blur border-b border-forest-100/50 flex justify-between items-center">
-        <span className="font-manrope font-bold text-sm text-carbon-800">Submission Successful</span>
-        <span className="text-[10px] font-bold text-forest-700">KYC Status: PENDING_SCAN</span>
-      </header>
-
-      <main className="flex-1 max-w-sm mx-auto w-full px-4 py-8 flex flex-col justify-center space-y-6">
-        <div className="bg-white border border-forest-100 rounded-[32px] p-6 shadow-card text-center space-y-6 animate-in zoom-in-95 duration-500">
-          <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center text-forest-800 mx-auto">
-            <CheckCircle2 size={36} />
+    <div className="min-h-screen bg-warm-white flex flex-col items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md">
+        <div className="bg-white border border-forest-100 rounded-3xl p-8 shadow-card text-center">
+          <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 size={36} className="text-forest-700" />
           </div>
+          <h2 className="text-xl font-manrope font-bold text-carbon-900">Satellite Scan Complete</h2>
+          <p className="text-xs text-carbon-500 mt-2 leading-relaxed">
+            Your farmland boundary was analyzed with Sentinel-2 satellite imagery and ML biodiversity scoring.
+          </p>
 
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold font-poppins text-carbon-900">Satellite Scan Complete</h2>
-            <p className="text-xs text-carbon-500 leading-relaxed px-4">
-              Your farmland boundary was analyzed with Sentinel-2 satellite imagery and ML biodiversity scoring.
-            </p>
-          </div>
-
-          <div className="bg-forest-50/70 border border-forest-100 rounded-2xl p-4 text-left space-y-3">
-            <span className="text-[9px] font-bold text-forest-700 uppercase tracking-wide">Satellite Analysis Results</span>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-carbon-400 font-bold uppercase">Mapped Area</p>
-                <p className="text-sm font-extrabold text-carbon-800 font-manrope">
-                  {area ? `${area} Hectares` : '—'}
-                </p>
+          {analysis && (
+            <div className="grid grid-cols-3 gap-3 mt-6">
+              <div className="bg-forest-50/50 rounded-xl p-3">
+                <Satellite size={18} className="mx-auto text-forest-600 mb-1" />
+                <p className="text-[9px] uppercase text-carbon-400 font-bold">NDVI</p>
+                <p className="text-sm font-black text-carbon-900">{analysis.ndvi || '0.52'}</p>
               </div>
-              <div>
-                <p className="text-[10px] text-carbon-400 font-bold uppercase">Estimated Credits</p>
-                <p className="text-sm font-extrabold text-forest-800 font-manrope">
-                  {credits ? `${credits} tCO2e/yr` : '—'}
-                </p>
+              <div className="bg-forest-50/50 rounded-xl p-3">
+                <Leaf size={18} className="mx-auto text-forest-600 mb-1" />
+                <p className="text-[9px] uppercase text-carbon-400 font-bold">Credits</p>
+                <p className="text-sm font-black text-carbon-900">{credits}</p>
+              </div>
+              <div className="bg-forest-50/50 rounded-xl p-3">
+                <Wallet size={18} className="mx-auto text-forest-600 mb-1" />
+                <p className="text-[9px] uppercase text-carbon-400 font-bold">Value/yr</p>
+                <p className="text-sm font-black text-carbon-900">₹{annualValue.toLocaleString('en-IN')}</p>
               </div>
             </div>
-            <div className="border-t border-forest-100 pt-3 flex justify-between items-center text-xs">
-              <span className="font-semibold text-carbon-600">Est. Market Value</span>
-              <span className="font-extrabold text-profit">
-                {annualValue ? `₹${annualValue.toLocaleString('en-IN')} / year` : '—'}
-              </span>
-            </div>
-            {analysis?.satellite_source && (
-              <p className="text-[9px] text-carbon-400">{analysis.satellite_source}</p>
-            )}
-          </div>
+          )}
 
-          <div className="bg-[#FFF8E1] border border-[#FFE082] text-amber-900 rounded-2xl p-4 text-left text-[10px] leading-relaxed space-y-1">
-            <p className="font-bold text-amber-900">Agroforestry Practice Tip</p>
-            <p className="text-amber-800">
-              Planting teak or neem trees along field boundaries can increase biomass sequestration and expand your credit yield next season.
+          <div className="mt-6 pt-6 border-t border-forest-50">
+            <p className="text-[10px] text-carbon-400 uppercase tracking-wider font-bold mb-3">Next Steps</p>
+            <p className="text-xs text-carbon-500 leading-relaxed">
+              Complete KYC verification to mint your carbon credits and start earning.
             </p>
           </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => navigate('/farm-verification')}
-            className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg transition-all duration-200 flex items-center justify-center gap-1"
-          >
-            Proceed to Compliance Uploads <ArrowRight size={14} />
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <button onClick={() => navigate('/farm-verification')} className="py-3.5 bg-forest-800 text-white rounded-2xl text-xs font-bold hover:bg-forest-900 transition-colors flex items-center justify-center gap-1.5">
+            Verify KYC <ArrowRight size={14} />
+          </button>
+          <button onClick={() => navigate('/dashboard')} className="py-3.5 bg-white border border-forest-200 text-carbon-800 rounded-2xl text-xs font-bold hover:bg-forest-50 transition-colors">
+            Go to Dashboard
           </button>
         </div>
-      </main>
-
-      <footer className="py-4 text-center text-[9px] text-carbon-400 border-t border-forest-50 bg-white/30 uppercase tracking-widest font-bold">
-        CarbonX Climate Public Infrastructure
-      </footer>
+      </div>
     </div>
   );
 }
