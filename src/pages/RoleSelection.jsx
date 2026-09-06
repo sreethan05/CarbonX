@@ -1,18 +1,51 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Compass, ShieldCheck, HelpCircle, Globe, Smartphone, Landmark, Cpu, Database } from 'lucide-react';
+import { ArrowRight, Compass, ShieldCheck, HelpCircle, Globe, Smartphone, Landmark, Cpu, Database, Building2, BadgeCheck } from 'lucide-react';
 
 export default function RoleSelection() {
   const navigate = useNavigate();
 
+  const roles = [
+    {
+      id: 'farmer',
+      title: 'Farmer',
+      desc: 'Register your farm, verify land ownership, and earn carbon credits through satellite-verified sustainable practices.',
+      icon: Compass,
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      hover: 'hover:border-emerald-400 hover:shadow-emerald-100',
+    },
+    {
+      id: 'buyer',
+      title: 'Corporate Buyer',
+      desc: 'Browse verified carbon credit listings, analyze farm data, and purchase high-integrity credits from farmers.',
+      icon: Building2,
+      color: 'bg-sky-50 text-sky-700 border-sky-200',
+      hover: 'hover:border-sky-400 hover:shadow-sky-100',
+    },
+    {
+      id: 'verifier',
+      title: 'Verifier / Govt',
+      desc: 'Review KYC verifications, audit land documents, and ensure compliance across all carbon credit issuance.',
+      icon: BadgeCheck,
+      color: 'bg-amber-50 text-amber-700 border-amber-200',
+      hover: 'hover:border-amber-400 hover:shadow-amber-100',
+    },
+    {
+      id: 'admin',
+      title: 'Admin',
+      desc: 'Full platform oversight — manage users, monitor transactions, and configure system settings.',
+      icon: ShieldCheck,
+      color: 'bg-rose-50 text-rose-700 border-rose-200',
+      hover: 'hover:border-rose-400 hover:shadow-rose-100',
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-warm-white flex flex-col justify-between font-inter text-carbon-800">
-      
-      {/* Top Header Bar */}
       <header className="py-3 px-6 bg-white/80 backdrop-blur-md flex justify-between items-center border-b border-forest-100/60 sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => navigate('/')} 
+          <button
+            onClick={() => navigate('/')}
             className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors flex items-center gap-1 text-xs font-semibold"
             title="Back to Home"
           >
@@ -20,155 +53,62 @@ export default function RoleSelection() {
             <span className="hidden sm:inline">Home</span>
           </button>
           <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" onClick={() => navigate('/')}>
-            🌱 CarbonX
+            CarbonX
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => navigate('/farmer-login')}
-            className="text-xs font-bold text-forest-800 hover:text-forest-900 px-3 py-1.5 rounded-xl hover:bg-forest-50 transition-colors"
-          >
-            Farmer Login
-          </button>
-        </div>
+        <button
+          onClick={() => navigate('/farmer-login')}
+          className="text-xs font-semibold text-carbon-600 hover:text-forest-700 flex items-center gap-1.5 px-4 py-2 rounded-xl hover:bg-forest-50 transition-colors"
+        >
+          <Smartphone size={14} />
+          Login
+        </button>
       </header>
 
-      {/* Main Body */}
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 space-y-8">
-        
-        {/* Title */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-extrabold font-manrope text-carbon-900 leading-tight">
-            Empowering Green Futures
-          </h1>
-          <p className="text-xs text-carbon-500 leading-relaxed">
-            Select your identity to access the CarbonX ecosystem. We connect verified sustainable farming with global carbon markets.
-          </p>
-        </div>
-
-        {/* Roles Grid Cards */}
-        <div className="space-y-4">
-          
-          {/* Farmer Card */}
-          <div className="bg-white border border-forest-100 rounded-3xl p-6 shadow-card space-y-4 hover:border-forest-200 transition-all duration-300">
-            <div className="flex gap-4 items-start">
-              <div className="p-3 bg-forest-50 text-forest-800 rounded-2xl">
-                {/* Tractor Icon Simulation */}
-                <span>🚜</span>
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-carbon-800 font-poppins">Farmer</h3>
-                <p className="text-xs text-carbon-500 leading-normal">
-                  Register your land, track carbon sequestration, and earn credits for sustainable practices.
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-              <button 
-                onClick={() => navigate('/farmer-register')}
-                className="w-full bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-3.5 rounded-2xl shadow transition-all duration-200 flex items-center justify-center gap-1.5"
-              >
-                <span>Register New Farm</span>
-                <ArrowRight size={14} />
-              </button>
-              <button 
-                onClick={() => navigate('/farmer-login')}
-                className="w-full border-2 border-forest-700 hover:bg-forest-50 text-forest-800 text-xs font-bold font-poppins py-3.5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5"
-              >
-                <span>Farmer Sign In</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Corporate Buyer Card */}
-          <div className="bg-white border border-forest-100 rounded-3xl p-6 shadow-card space-y-4 hover:border-forest-200 transition-all duration-300">
-            <div className="flex gap-4 items-start">
-              <div className="p-3 bg-sky-light/40 text-sky-dark rounded-2xl">
-                <span>🏢</span>
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-carbon-800 font-poppins">Corporate Buyer</h3>
-                <p className="text-xs text-carbon-500 leading-normal">
-                  Offset emissions by purchasing verified, high-integrity carbon credits from Indian farmers.
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={() => navigate('/corporate-dashboard')}
-              className="w-full border border-carbon-800 hover:bg-carbon-50 text-carbon-800 text-xs font-bold font-poppins py-3.5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5"
-            >
-              Explore Market 📈
-            </button>
-          </div>
-
-          {/* FPO Partner Card */}
-          <div className="bg-white border border-forest-100 rounded-3xl p-6 shadow-card space-y-4 hover:border-forest-200 transition-all duration-300">
-            <div className="flex gap-4 items-start">
-              <div className="p-3 bg-rose-100/60 text-rose-700 rounded-2xl">
-                <span>👥</span>
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-carbon-800 font-poppins">FPO Partner</h3>
-                <p className="text-xs text-carbon-500 leading-normal">
-                  Manage clusters of farmers, digitize records, and facilitate verification processes.
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={() => navigate('/admin-dashboard')}
-              className="w-full bg-forest-700 hover:bg-forest-800 text-white text-xs font-bold font-poppins py-3.5 rounded-2xl shadow transition-all duration-200 flex items-center justify-center gap-1.5"
-            >
-              Partner Login 💎
-            </button>
-          </div>
-
-          {/* Admin Card */}
-          <div className="bg-white border border-forest-100 rounded-3xl p-6 shadow-card space-y-4 hover:border-forest-200 transition-all duration-300">
-            <div className="flex gap-4 items-start">
-              <div className="p-3 bg-carbon-50 text-carbon-600 rounded-2xl">
-                <span>🛡️</span>
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-carbon-800 font-poppins">Admin / Verifier</h3>
-                <p className="text-xs text-carbon-500 leading-normal">
-                  Access satellite data validation, compliance tools, and system-wide analytics.
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={() => navigate('/admin-dashboard')}
-              className="w-full border border-carbon-200 hover:bg-carbon-50 text-carbon-700 text-xs font-bold font-poppins py-3.5 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5"
-            >
-              System Access 🔒
-            </button>
-          </div>
-
-        </div>
-
-        {/* Bottom Scientific verification card matching Screenshot 3 */}
-        <div className="rounded-[28px] overflow-hidden border border-forest-100 shadow-lg relative h-48 flex items-end">
-          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=600')` }}>
-            <div className="w-full h-full bg-gradient-to-t from-forest-900/90 via-forest-900/60 to-transparent"></div>
-          </div>
-          <div className="relative z-10 p-6 space-y-1">
-            <span className="inline-block bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-md text-[9px] font-extrabold text-earth-light tracking-wide border border-white/10 uppercase mb-1">
-              ✓ Scientific Verification
-            </span>
-            <h4 className="text-sm font-bold text-white font-poppins">Satellite-First Verification</h4>
-            <p className="text-[10px] text-forest-100/90 leading-relaxed font-inter">
-              Every credit on CarbonX is backed by rigorous remote sensing data and ground-level audits, ensuring unparalleled integrity in the voluntary carbon market.
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+        <div className="max-w-5xl w-full">
+          <div className="text-center mb-10">
+            <h1 className="font-manrope font-extrabold text-3xl sm:text-4xl text-carbon-900 mb-3">
+              Choose Your Role
+            </h1>
+            <p className="text-sm text-carbon-500 max-w-xl mx-auto">
+              CarbonX connects farmers, buyers, verifiers, and administrators on one platform for transparent carbon credit trading.
             </p>
           </div>
-        </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            {roles.map((role) => {
+              const Icon = role.icon;
+              return (
+                <button
+                  key={role.id}
+                  onClick={() => navigate(`/farmer-register?role=${role.id}`)}
+                  className={`group text-left p-6 rounded-2xl border-2 bg-white transition-all duration-300 ${role.hover} hover:shadow-lg`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${role.color}`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-manrope font-bold text-lg text-carbon-900 mb-1">
+                        {role.title}
+                      </h3>
+                      <p className="text-xs text-carbon-500 leading-relaxed">
+                        {role.desc}
+                      </p>
+                    </div>
+                    <ArrowRight size={18} className="text-carbon-300 group-hover:text-carbon-600 group-hover:translate-x-1 transition-all" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </main>
 
-      {/* Footer support badges matches Screenshot 3 */}
-      <footer className="py-6 border-t border-forest-50 text-center text-[10px] text-carbon-400 font-inter bg-white/30 space-y-1">
-        <p>© 2026 CarbonX. Supported by Ministry of Agriculture.</p>
-        <p className="text-forest-600 font-medium">Digital Public Infrastructure (DPI) Enabled</p>
+      <footer className="py-4 px-6 text-center text-xs text-carbon-400">
+        CarbonX — Satellite-verified carbon credits for Indian farmers
       </footer>
-
     </div>
   );
 }
