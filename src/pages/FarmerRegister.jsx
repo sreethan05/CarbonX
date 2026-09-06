@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, CheckCircle2, ArrowRight, ShieldCheck, Landmark, 
   Globe, Loader2, Phone, User, Check, AlertCircle, LogIn 
@@ -35,6 +35,8 @@ const isValidAadhaar = (value) => {
 
 export default function FarmerRegister() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedRole = searchParams.get('role') || 'farmer';
   const { t, changeLanguage, currentLang } = useLanguage();
   const { login } = useAuth();
 
@@ -127,13 +129,14 @@ export default function FarmerRegister() {
         district: district.trim(), 
         village: village.trim(), 
         upi: upi.trim(), 
-        preferred_language: currentLang 
+        preferred_language: currentLang,
+        role: selectedRole
       });
       if (res.success) {
         await login(res.token, res.user);
         if (res.user?.preferred_language) changeLanguage(res.user.preferred_language);
-        // Guide smoothly to Step 2 of farmer onboarding: Land Verification
-        navigate('/farm-verification');
+        // Farmer goes to KYC verification, others go to dashboard
+        navigate(selectedRole === 'farmer' ? '/farm-verification' : '/dashboard');
       } else {
         setError(res.message || "Registration failed");
         if (res.message?.includes("OTP")) {
@@ -172,8 +175,13 @@ export default function FarmerRegister() {
             className="font-manrope font-extrabold text-lg text-forest-800 tracking-tight flex items-center gap-1.5 cursor-pointer" 
             onClick={() => navigate('/')}
           >
-            🌱 CarbonX
+            CarbonX
           </span>
+          {selectedRole !== 'farmer' && (
+            <span className="text-[10px] font-bold text-forest-600 bg-forest-50 px-2 py-1 rounded-lg uppercase tracking-wide">
+              {selectedRole}
+            </span>
+          )}
         </div>
 
         {/* Language selector & quick login */}
@@ -210,14 +218,14 @@ export default function FarmerRegister() {
             type="button"
             className="flex-1 py-2.5 rounded-xl text-xs font-bold font-poppins transition-all bg-white text-forest-900 shadow-sm flex items-center justify-center gap-1.5"
           >
-            <span>➕ Register New Farm</span>
+            <span>Register New Account</span>
           </button>
           <button 
             type="button"
             onClick={() => navigate('/farmer-login')}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold font-poppins transition-all text-carbon-500 hover:text-forest-900 hover:bg-white/50 flex items-center justify-center gap-1.5"
           >
-            <span>🌾 Existing Farmer Login</span>
+            <span>Existing User Login</span>
           </button>
         </div>
 
@@ -225,8 +233,8 @@ export default function FarmerRegister() {
         <div className="mb-6 bg-white border border-forest-100 rounded-2xl p-4 shadow-sm">
           <div className="flex items-center justify-between text-[11px] font-bold mb-2.5">
             <span className={step >= 1 ? "text-forest-800" : "text-carbon-400"}>1. Phone & OTP</span>
-            <span className={step >= 2 ? "text-forest-800" : "text-carbon-400"}>2. Farmer Profile</span>
-            <span className={step >= 3 ? "text-forest-800" : "text-carbon-400"}>3. UPI Direct Pay</span>
+            <span className={step >= 2 ? "text-forest-800" : "text-carbon-400"}>2. Profile & Location</span>
+            <span className={step >= 3 ? "text-forest-800" : "text-carbon-400"}>3. UPI Setup</span>
           </div>
           <div className="w-full bg-forest-100/80 h-2 rounded-full overflow-hidden flex">
             <div 
@@ -258,7 +266,7 @@ export default function FarmerRegister() {
                   {otpSent ? "Verify Your Mobile Number" : "Enter Mobile Number"}
                 </h1>
                 <p className="text-xs text-carbon-500 leading-relaxed">
-                  {otpSent ? `Enter the 6-digit OTP sent via SMS to +91 ${phone}` : "We will send an SMS OTP to link your farmland profile securely."}
+                  {otpSent ? `Enter the 6-digit OTP sent via SMS to +91 ${phone}` : "We will send an SMS OTP to link your profile securely."}
                 </p>
               </div>
 
@@ -268,7 +276,6 @@ export default function FarmerRegister() {
                     <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">Mobile Number</label>
                     <div className="flex bg-warm-white border border-forest-200 focus-within:border-forest-600 focus-within:ring-2 focus-within:ring-forest-100 rounded-2xl p-3 items-center transition-all shadow-inner">
                       <div className="flex items-center gap-1.5 pr-2.5 border-r border-forest-200 mr-2.5 text-xs font-bold text-carbon-700">
-                        <span>🇮🇳</span>
                         <span>+91</span>
                       </div>
                       <input 
@@ -375,23 +382,23 @@ export default function FarmerRegister() {
             </div>
           )}
 
-          {/* STEP 2: Farmer & Land Details */}
+          {/* STEP 2: Profile & Land Details */}
           {step === 2 && (
             <form onSubmit={handleBasicDetails} className="space-y-5">
               <div className="space-y-1">
                 <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-2xl flex items-center justify-center mb-2 border border-forest-100">
                   <User size={20} />
                 </div>
-                <h1 className="text-xl font-bold font-manrope text-carbon-900">Farmer & Farmland Profile</h1>
+                <h1 className="text-xl font-bold font-manrope text-carbon-900">Profile & Location Details</h1>
                 <p className="text-xs text-carbon-500 leading-relaxed">
-                  Enter your details as recorded in your Patta passbook or 7/12 land revenue extract.
+                  Enter your details as recorded in your land records.
                 </p>
               </div>
 
               {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide">
-                  Farmer Full Name (as on Land Records)
+                  Full Name (as on Land Records)
                 </label>
                 <input 
                   type="text" 
@@ -436,7 +443,7 @@ export default function FarmerRegister() {
 
               {/* Location: State, District, Village */}
               <div className="space-y-3 pt-1 border-t border-forest-50">
-                <p className="text-xs font-bold text-carbon-800">Farmland Location</p>
+                <p className="text-xs font-bold text-carbon-800">Location</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-carbon-600">State</label>
@@ -484,7 +491,7 @@ export default function FarmerRegister() {
                   type="submit" 
                   className="flex-1 bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>Continue to Payout Setup</span>
+                  <span>Continue to UPI Setup</span>
                   <ArrowRight size={14} />
                 </button>
               </div>
@@ -498,9 +505,12 @@ export default function FarmerRegister() {
                 <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-2xl flex items-center justify-center mb-2 border border-forest-100">
                   <Landmark size={20} />
                 </div>
-                <h1 className="text-xl font-bold font-manrope text-carbon-900">Direct UPI Bank Payout</h1>
+                <h1 className="text-xl font-bold font-manrope text-carbon-900">UPI Payment Setup</h1>
                 <p className="text-xs text-carbon-500 leading-relaxed">
-                  When corporate buyers buy your verified carbon credits, payments are credited straight to your bank via UPI.
+                  {selectedRole === 'farmer' 
+                    ? "When corporate buyers buy your verified carbon credits, payments are credited straight to your bank via UPI."
+                    : "Link your UPI ID for receiving payments and transactions on CarbonX."
+                  }
                 </p>
               </div>
 
@@ -522,15 +532,17 @@ export default function FarmerRegister() {
               </div>
 
               {/* Instant settlement explanation card */}
-              <div className="p-4 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl text-xs text-emerald-900 space-y-2">
-                <p className="font-bold flex items-center gap-1.5 text-emerald-950">
-                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
-                  Zero Commission Direct Settlements:
-                </p>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  CarbonX operates with zero middleman deductions. 100% of the agreed corporate credit sale price will be transferred to your linked bank account.
-                </p>
-              </div>
+              {selectedRole === 'farmer' && (
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl text-xs text-emerald-900 space-y-2">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-950">
+                    <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                    Zero Commission Direct Settlements:
+                  </p>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed">
+                    CarbonX operates with zero middleman deductions. 100% of the agreed corporate credit sale price will be transferred to your linked bank account.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button 
@@ -546,10 +558,10 @@ export default function FarmerRegister() {
                   className="flex-1 bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold font-poppins py-4 rounded-2xl shadow-lg hover:shadow-premium transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                 >
                   {loading ? (
-                    <><Loader2 size={16} className="animate-spin" /> Creating Account & Profile...</>
+                    <><Loader2 size={16} className="animate-spin" /> Creating Account...</>
                   ) : (
                     <>
-                      <span>Complete Registration & Verify Land</span>
+                      <span>Complete Registration</span>
                       <ArrowRight size={14} />
                     </>
                   )}
@@ -566,7 +578,7 @@ export default function FarmerRegister() {
               onClick={() => navigate('/farmer-login')}
               className="text-xs font-bold text-forest-800 hover:underline"
             >
-              Sign In to Your Farmer Profile →
+              Sign In to Your Account
             </button>
           </div>
 
@@ -581,7 +593,7 @@ export default function FarmerRegister() {
 
       {/* Footer */}
       <footer className="py-4 px-6 text-center text-xs text-carbon-400 border-t border-forest-100/60 bg-white/60 backdrop-blur-sm">
-        🔒 256-Bit SSL Encrypted Public Infrastructure • Ministry of Agriculture Aligned
+        256-Bit SSL Encrypted Public Infrastructure
       </footer>
 
     </div>
