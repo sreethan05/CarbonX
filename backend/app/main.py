@@ -369,6 +369,8 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             reasons.append(f"Owner name '{profile.get('name')}' could not be verified in the land record text.")
         if not checks["ocr_available"]:
             reasons.append("OCR service is unavailable on the server.")
+        if not checks.get("exif_present"):
+            reasons.append("Document appears to be a screenshot or downloaded file (no camera metadata).")
         ndvi = checks.get("satellite_ndvi") or {}
         if ndvi and float(ndvi.get("ndvi") or 0) < 0.15:
             reasons.append("Satellite analysis indicates barren land (NDVI below 0.15).")
@@ -403,6 +405,21 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
         raise
     except ValueError as exc:
         return {"success": False, "message": str(exc)}
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
+
+
+@app.get("/kyc/status/{phone}")
+def get_kyc_status(phone: str, current_user: dict = Depends(get_current_user)):
+    """Return the latest KYC verification record for a farmer."""
+    try:
+        _require_database()
+        record = db.get_kyc_status(phone)
+        if not record:
+            return {"success": True, "status": "PENDING", "message": "No KYC verification found."}
+        return {"success": True, "status": record.get("status"), "verification": record}
+    except HTTPException:
+        raise
     except Exception as exc:
         return {"success": False, "message": str(exc)}
 
