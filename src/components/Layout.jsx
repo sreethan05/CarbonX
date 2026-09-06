@@ -1,116 +1,91 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Compass, ShoppingCart, Wallet, UserCheck, Menu, Bell, Globe, X, ChevronRight, ChevronDown, LogOut, LogIn } from 'lucide-react';
-import { mockFarmer } from '../data/mockData';
+import { Home, Compass, ShoppingCart, Wallet, UserCheck, Menu, Bell, Globe, X, LogOut, ShieldCheck, Building2, BadgeCheck, ClipboardList, BarChart3 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
-const ALL_ROUTES = [
-  { category: "Auth & Onboarding", items: [
-    { name: "Landing Page", path: "/" },
-    { name: "Role Selection", path: "/role-selection" },
-    { name: "Farmer Register", path: "/farmer-register" },
-    { name: "Farmer Login", path: "/farmer-login" },
-    { name: "Welcome Onboarding", path: "/onboarding" },
-  ]},
-  { category: "Farm Mapping & KYC", items: [
-    { name: "Farm Map (Draw)", path: "/farm-map" },
-    { name: "Farm Details Form", path: "/farm-details" },
-    { name: "Satellite Review", path: "/satellite-preview" },
-    { name: "Submission Success", path: "/submission-success" },
-    { name: "Compliance Uploads", path: "/farm-verification" },
-    { name: "Orbit Audit Success", path: "/verification-success" },
-  ]},
-  { category: "Farmer Dashboards", items: [
-    { name: "Main Dashboard", path: "/farmer-dashboard" },
-    { name: "Farm Analytics", path: "/farm-analytics" },
-    { name: "Carbon Wallet", path: "/wallet" },
-    { name: "Create Credit Listing", path: "/create-listing" },
-    { name: "Support & Bot", path: "/support" },
-  ]},
-  { category: "Marketplace & ESG", items: [
-    { name: "Corporate Portal", path: "/corporate-welcome" },
-    { name: "Carbon Marketplace", path: "/marketplace" },
-    { name: "Credit Deep Dive", path: "/credit-analysis/auc-01" },
-    { name: "Corporate ESG Dashboard", path: "/corporate-dashboard" },
-    { name: "Admin Approvals Centre", path: "/admin-dashboard" },
-  ]},
-];
+const ROLE_NAV = {
+  farmer: [
+    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
+    { name: "KYC Verification", key: "kyc", path: "/farm-verification", icon: ShieldCheck },
+    { name: "Farm Analytics", key: "farm", path: "/farm-analytics", icon: Compass },
+    { name: "Marketplace", key: "market", path: "/marketplace", icon: ShoppingCart },
+    { name: "Carbon Wallet", key: "wallet", path: "/wallet", icon: Wallet },
+    { name: "Support", key: "support", path: "/support", icon: UserCheck },
+  ],
+  buyer: [
+    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
+    { name: "Marketplace", key: "market", path: "/marketplace", icon: ShoppingCart },
+    { name: "Credit Analysis", key: "analytics", path: "/farm-analytics", icon: BarChart3 },
+    { name: "Wallet", key: "wallet", path: "/wallet", icon: Wallet },
+  ],
+  verifier: [
+    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
+    { name: "Marketplace", key: "market", path: "/marketplace", icon: ClipboardList },
+    { name: "Support", key: "support", path: "/support", icon: UserCheck },
+  ],
+  admin: [
+    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
+    { name: "Marketplace", key: "market", path: "/marketplace", icon: ClipboardList },
+    { name: "Support", key: "support", path: "/support", icon: UserCheck },
+  ],
+};
+
+const ROLE_LABELS = {
+  farmer: "Farmer",
+  buyer: "Corporate Buyer",
+  verifier: "Verifier",
+  admin: "Admin",
+};
+
+const ROLE_COLORS = {
+  farmer: "bg-emerald-50 text-emerald-700",
+  buyer: "bg-sky-50 text-sky-700",
+  verifier: "bg-amber-50 text-amber-700",
+  admin: "bg-rose-50 text-rose-700",
+};
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, changeLanguage, currentLang } = useLanguage();
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, role, isAuthenticated } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showAllRoutes, setShowAllRoutes] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/farmer-login');
   };
 
-  const displayName = user?.name || mockFarmer.name;
-  const displayVillage = [user?.village, user?.district].filter(Boolean).join(', ') || mockFarmer.village;
-  const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'F';
+  const displayName = user?.name || 'User';
+  const displayVillage = [user?.village, user?.district].filter(Boolean).join(', ') || '';
+  const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
-  const ProfileAvatar = ({ className = '' }) => (
-    <div className={`bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 ${className}`}>
-      {initials}
-    </div>
-  );
+  const navItems = ROLE_NAV[role] || ROLE_NAV.farmer;
 
   const isPublicPage =
     location.pathname === '/' ||
     location.pathname === '/role-selection' ||
     location.pathname === '/farmer-register' ||
-    location.pathname === '/farmer-login' ||
-    location.pathname === '/onboarding' ||
-    location.pathname === '/satellite-preview' ||
-    location.pathname === '/submission-success';
-
-  const navItems = [
-    { name: "Home", key: "home", path: "/farmer-dashboard", icon: Home },
-    { name: "Farm", key: "farm", path: "/farm-analytics", icon: Compass },
-    { name: "Market", key: "market", path: "/marketplace", icon: ShoppingCart },
-    { name: "Wallet", key: "wallet", path: "/wallet", icon: Wallet },
-    { name: "Support", key: "support", path: "/support", icon: UserCheck }
-  ];
+    location.pathname === '/farmer-login';
 
   const getActiveTabClass = (path) => {
-    return location.pathname === path ||
-      (path === '/farmer-dashboard' && location.pathname === '/farmer-dashboard') ||
-      (path === '/farm-analytics' && ['/farm-analytics', '/farm-map', '/farm-details', '/satellite-preview', '/submission-success'].includes(location.pathname));
+    if (location.pathname === path) return true;
+    if (path === '/dashboard' && location.pathname.startsWith('/dashboard')) return true;
+    if (path === '/farm-analytics' && ['/farm-analytics', '/farm-map', '/farm-details', '/satellite-preview', '/submission-success'].includes(location.pathname)) return true;
+    return false;
   };
 
   const [notificationsList, setNotificationsList] = useState(() => {
     const local = localStorage.getItem('carbonx_notifications');
     if (local) return JSON.parse(local);
-    const initial = [
-      { id: 1, text: "Verification Successful: North Grove Plot is 100% verified.", time: "1 hr ago", type: "success" },
-      { id: 2, text: "New Buyer Bid: TATA ESG offered ₹530/credit for Andhra Paddy.", time: "3 hrs ago", type: "info" },
-      { id: 3, text: "Escrow Locked: ₹12,480 compliance funds secured.", time: "4 hrs ago", type: "info" },
-      { id: 4, text: "UPI Payout Initiated: ₹8,000 sent to ramesh.kumar@oksbi.", time: "1 day ago", type: "payment" },
-      { id: 5, text: "⚠️ Outbid Alert: Anila Devi's Sugarcane lot received a higher bid.", time: "2 days ago", type: "warning" }
-    ];
-    localStorage.setItem('carbonx_notifications', JSON.stringify(initial));
-    return initial;
+    return [];
   });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const local = localStorage.getItem('carbonx_notifications');
-      if (local) setNotificationsList(JSON.parse(local));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
-
-  const handleLanguageChange = (e) => changeLanguage(e.target.value);
 
   const goTo = (path) => {
     navigate(path);
@@ -118,71 +93,41 @@ export default function Layout({ children }) {
   };
 
   if (isPublicPage) {
-    return <div className="min-h-screen flex flex-col">{children}</div>;
+    return <div className="min-h-screen bg-warm-white">{children}</div>;
   }
 
   return (
-    <div className="min-h-screen bg-warm-white flex flex-col pb-24 md:pb-0 md:pl-64">
-
-      {/* ── Mobile Top Header ── */}
-      <header className="sticky top-0 z-40 bg-warm-white/95 backdrop-blur-md border-b border-forest-100/50 py-3 px-4 flex justify-between items-center md:hidden">
+    <div className="min-h-screen bg-warm-white flex flex-col">
+      {/* Top Header */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-forest-100/60 flex justify-between items-center px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 hover:bg-forest-50 rounded-xl text-carbon-800 transition-colors"
-            aria-label="Open menu"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors md:hidden"
           >
-            <Menu size={22} />
+            <Menu size={20} />
           </button>
-          <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight flex items-center gap-1.5">
-            🌱 CarbonX
+          <span
+            className="font-manrope font-extrabold text-lg text-forest-800 tracking-tight cursor-pointer"
+            onClick={() => navigate('/dashboard')}
+          >
+            CarbonX
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-forest-50 border border-forest-100 rounded-xl px-2 py-1 text-xs text-forest-900">
-            <Globe size={12} className="text-forest-700" />
-            <select
-              value={currentLang}
-              onChange={handleLanguageChange}
-              className="bg-transparent border-none outline-none text-[10px] font-bold focus:ring-0 cursor-pointer text-forest-900"
-            >
-              <option value="en">EN</option>
-              <option value="hi">HI</option>
-              <option value="te">TE</option>
-            </select>
-          </div>
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2 hover:bg-forest-50 rounded-xl text-carbon-800 transition-colors relative"
-          >
-            <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
-          </button>
-          <button
-            onClick={() => navigate('/farmer-dashboard')}
-            className="w-9 h-9 rounded-full overflow-hidden border border-forest-200/80 shadow-sm"
-          >
-            <ProfileAvatar className="w-full h-full" />
-          </button>
-        </div>
-      </header>
-
-      {/* ── Desktop Sidebar ── */}
-      <aside className="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-forest-100 shadow-sm hidden md:flex flex-col justify-between overflow-y-auto">
-        <div className="p-6 space-y-6">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 bg-forest-700 rounded-xl flex items-center justify-center text-white font-bold text-lg">🌱</span>
-            <span className="font-manrope font-extrabold text-2xl text-forest-800 tracking-tight">CarbonX</span>
-          </div>
-
-          <div className="bg-forest-50/50 border border-forest-100/50 rounded-2xl p-3 flex items-center justify-between text-xs text-carbon-600">
-            <span className="flex items-center gap-1.5 font-semibold text-carbon-700">
-              <Globe size={14} className="text-forest-700" /> Language
+          {isAuthenticated && (
+            <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wide ${ROLE_COLORS[role] || ROLE_COLORS.farmer}`}>
+              {ROLE_LABELS[role] || 'User'}
             </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Language selector */}
+          <div className="flex items-center gap-1 bg-forest-50/80 border border-forest-100 rounded-xl px-2.5 py-1 text-xs text-forest-900 font-semibold">
+            <Globe size={13} className="text-forest-700" />
             <select
               value={currentLang}
-              onChange={handleLanguageChange}
-              className="bg-transparent border-none outline-none font-bold text-forest-800 focus:ring-0 cursor-pointer text-xs"
+              onChange={e => changeLanguage(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs font-bold text-forest-900 focus:ring-0 cursor-pointer"
             >
               <option value="en">English</option>
               <option value="hi">हिन्दी</option>
@@ -190,214 +135,58 @@ export default function Layout({ children }) {
             </select>
           </div>
 
-          {/* Primary nav */}
-          <nav className="space-y-1.5">
-            {navItems.map((item, idx) => {
-              const active = getActiveTabClass(item.path);
-              return (
-                <button
-                  key={idx}
-                  onClick={() => navigate(item.path)}
-                  className={`w-full py-3 px-4 rounded-2xl flex items-center gap-3.5 text-sm font-semibold transition-all duration-200 ${
-                    active ? 'bg-forest-100 text-forest-900 border border-forest-200/30' : 'hover:bg-forest-50/50 text-carbon-500 hover:text-forest-800'
-                  }`}
-                >
-                  <item.icon size={19} className={active ? "text-forest-700" : "text-carbon-400"} />
-                  <span>{t(item.key)}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* All pages collapsible section */}
-          <div className="pt-2 border-t border-forest-100/60 space-y-2">
-            <button 
-              onClick={() => setShowAllRoutes(!showAllRoutes)}
-              className="w-full flex items-center justify-between text-[11px] font-bold text-forest-700 uppercase tracking-wider py-1.5 px-1 hover:text-forest-900 transition-colors"
-            >
-              <span>Platform Directory</span>
-              <ChevronDown size={14} className={`transition-transform duration-200 ${showAllRoutes ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {showAllRoutes && (
-              <div className="space-y-4 pt-1 animate-in fade-in duration-200">
-                {ALL_ROUTES.map((cat, ci) => (
-                  <div key={ci}>
-                    <p className="text-[10px] font-bold text-carbon-400 uppercase tracking-wider mb-1 px-1">{cat.category}</p>
-                    <div className="space-y-0.5">
-                      {cat.items.map((item, ii) => {
-                        const active = location.pathname === item.path;
-                        return (
-                          <button
-                            key={ii}
-                            onClick={() => navigate(item.path)}
-                            className={`w-full text-left py-1.5 px-2.5 rounded-xl text-xs font-medium flex items-center justify-between transition-all ${
-                              active ? 'bg-forest-100 text-forest-900 font-bold' : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
-                            }`}
-                          >
-                            <span>{item.name}</span>
-                            {active && <ChevronRight size={12} className="text-forest-600" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Profile & Logout card */}
-        <div className="p-4 border-t border-forest-100/80 space-y-3 bg-forest-50/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden border border-forest-200 shadow-sm shrink-0">
-              <ProfileAvatar className="w-full h-full" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-carbon-800 truncate leading-tight">{displayName}</p>
-              <p className="text-[10px] text-forest-600 truncate">{displayVillage}</p>
-            </div>
-          </div>
-          
-          {token ? (
+          {/* Notifications */}
+          {isAuthenticated && (
             <button
-              onClick={handleLogout}
-              className="w-full py-2 px-3 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors relative"
             >
-              <LogOut size={13} />
-              <span>Log Out</span>
+              <Bell size={18} />
+              {notificationsList.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
+              )}
             </button>
+          )}
+
+          {/* Profile avatar */}
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
+                {initials}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 hover:bg-rose-50 rounded-xl text-carbon-600 hover:text-rose-600 transition-colors"
+                title="Logout"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => navigate('/farmer-login')}
-              className="w-full py-2 px-3 rounded-xl bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              className="text-xs font-bold text-forest-800 hover:text-forest-900 px-3 py-1.5 rounded-xl hover:bg-forest-50 transition-colors"
             >
-              <LogIn size={13} />
-              <span>Sign In</span>
+              Login
             </button>
           )}
         </div>
-      </aside>
+      </header>
 
-      {/* ── Mobile Slide-Out Sidebar ── */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-          {/* Drawer */}
-          <div className="relative w-72 max-w-[85vw] bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left duration-250 overflow-y-auto">
-            <div className="sticky top-0 bg-white z-10 px-5 py-4 flex items-center justify-between border-b border-forest-100">
-              <div className="flex items-center gap-2.5">
-                <span className="w-8 h-8 bg-forest-700 rounded-xl flex items-center justify-center text-white font-bold">🌱</span>
-                <span className="font-manrope font-extrabold text-lg text-forest-800">CarbonX</span>
-              </div>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-1.5 hover:bg-forest-50 rounded-xl text-carbon-500"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="flex-1 px-4 py-4 space-y-5">
-              {/* Quick nav */}
-              <div className="grid grid-cols-3 gap-2">
-                {navItems.map((item, idx) => {
-                  const active = getActiveTabClass(item.path);
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => goTo(item.path)}
-                      className={`flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[10px] font-bold transition-all ${
-                        active ? 'bg-forest-100 text-forest-900' : 'bg-forest-50/50 text-carbon-500 hover:bg-forest-100'
-                      }`}
-                    >
-                      <item.icon size={17} className={active ? "text-forest-700" : "text-carbon-400"} />
-                      <span>{t(item.key)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="border-t border-forest-100" />
-
-              {/* All pages */}
-              {ALL_ROUTES.map((cat, ci) => (
-                <div key={ci}>
-                  <p className="text-[10px] font-bold text-forest-600 uppercase tracking-wider mb-1.5 px-1">{cat.category}</p>
-                  <div className="space-y-0.5">
-                    {cat.items.map((item, ii) => {
-                      const active = location.pathname === item.path;
-                      return (
-                        <button
-                          key={ii}
-                          onClick={() => goTo(item.path)}
-                          className={`w-full text-left py-2 px-3 rounded-xl text-xs font-medium flex items-center justify-between transition-all ${
-                            active ? 'bg-forest-100 text-forest-900 border border-forest-200/50' : 'text-carbon-600 hover:bg-forest-50 hover:text-forest-800'
-                          }`}
-                        >
-                          <span>{item.name}</span>
-                          {active && <ChevronRight size={12} className="text-forest-600" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="px-5 py-4 border-t border-forest-100 space-y-3 bg-forest-50/20">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl overflow-hidden border border-forest-200 shrink-0">
-                  <ProfileAvatar className="w-full h-full" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
-                  <p className="text-[10px] text-forest-600 truncate">{displayVillage}</p>
-                </div>
-              </div>
-              
-              {token ? (
-                <button
-                  onClick={handleLogout}
-                  className="w-full py-2 px-3 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                >
-                  <LogOut size={13} />
-                  <span>Log Out</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => goTo('/farmer-login')}
-                  className="w-full py-2 px-3 rounded-xl bg-forest-800 hover:bg-forest-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                >
-                  <LogIn size={13} />
-                  <span>Sign In</span>
-                </button>
-              )}
-            </div>
+      {/* Notifications dropdown */}
+      {showNotifications && isAuthenticated && (
+        <div className="fixed top-14 right-4 z-40 bg-white border border-forest-100 rounded-2xl shadow-xl p-4 w-80 max-h-96 overflow-y-auto">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs font-bold text-carbon-800">Notifications</h3>
+            <button onClick={() => setShowNotifications(false)} className="p-1 hover:bg-forest-50 rounded-lg">
+              <X size={14} />
+            </button>
           </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 md:py-8">
-        {children}
-      </main>
-
-      {/* Notifications Drawer */}
-      {showNotifications && (
-        <div className="fixed top-14 right-4 z-50 w-80 bg-white/95 backdrop-blur-xl border border-forest-100 rounded-3xl p-4 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className="flex justify-between items-center pb-2 border-b border-forest-100 mb-2">
-            <span className="text-xs font-bold text-carbon-800 uppercase tracking-wide">Notifications</span>
-            <button onClick={() => setShowNotifications(false)} className="text-[10px] font-semibold text-forest-700 hover:underline">Mark read</button>
-          </div>
-          <div className="space-y-2">
-            {notificationsList.map(n => (
-              <div key={n.id} className="p-2.5 rounded-xl hover:bg-forest-50/60 text-xs transition-colors flex gap-2 border border-forest-50">
+          {notificationsList.length === 0 ? (
+            <p className="text-xs text-carbon-400 text-center py-4">No notifications yet</p>
+          ) : (
+            notificationsList.map((n) => (
+              <div key={n.id} className="py-2.5 border-b border-forest-50 last:border-0 hover:bg-forest-50/60 text-xs transition-colors flex gap-2">
                 <span className="text-base mt-0.5">
                   {n.type === 'success' ? '✅' : n.type === 'payment' ? '💰' : '🔔'}
                 </span>
@@ -406,36 +195,117 @@ export default function Layout({ children }) {
                   <span className="text-[9px] text-carbon-400 mt-1 block">{n.time}</span>
                 </div>
               </div>
-            ))}
-          </div>
+            ))
+          )}
         </div>
       )}
 
+      <div className="flex flex-1">
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:flex flex-col w-56 bg-white border-r border-forest-100/60 p-4 sticky top-[57px] h-[calc(100vh-57px)]">
+          <nav className="flex-1 space-y-1">
+            {navItems.map((item, idx) => {
+              const active = getActiveTabClass(item.path);
+              const Icon = item.icon;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => goTo(item.path)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    active
+                      ? 'bg-forest-100 text-forest-900 shadow-sm'
+                      : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
+                  }`}
+                >
+                  <Icon size={18} className={active ? 'text-forest-700' : 'text-carbon-400'} />
+                  <span>{item.name}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* User info at bottom */}
+          {isAuthenticated && (
+            <div className="pt-3 border-t border-forest-100">
+              <div className="flex items-center gap-2.5 px-2 py-2">
+                <div className="w-9 h-9 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
+                  {displayVillage && <p className="text-[10px] text-carbon-400 truncate">{displayVillage}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* Mobile Sidebar */}
+        {sidebarOpen && (
+          <>
+            <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={() => setSidebarOpen(false)} />
+            <aside className="fixed left-0 top-0 bottom-0 z-50 w-64 bg-white border-r border-forest-100 p-4 md:hidden flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <span className="font-manrope font-extrabold text-lg text-forest-800">CarbonX</span>
+                <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-forest-50 rounded-xl">
+                  <X size={18} />
+                </button>
+              </div>
+              <nav className="flex-1 space-y-1">
+                {navItems.map((item, idx) => {
+                  const active = getActiveTabClass(item.path);
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => goTo(item.path)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                        active
+                          ? 'bg-forest-100 text-forest-900 shadow-sm'
+                          : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
+                      }`}
+                    >
+                      <Icon size={18} className={active ? 'text-forest-700' : 'text-carbon-400'} />
+                      <span>{item.name}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+              {isAuthenticated && (
+                <div className="pt-3 border-t border-forest-100">
+                  <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
+                    <LogOut size={16} />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              )}
+            </aside>
+          </>
+        )}
+
+        {/* Main content */}
+        <main className="flex-1 overflow-x-hidden pb-20 md:pb-0">
+          {children}
+        </main>
+      </div>
+
       {/* Mobile Bottom Nav */}
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-forest-100/50 py-2.5 px-4 flex justify-around items-center md:hidden shadow-lg">
-        {navItems.map((item, idx) => {
+        {navItems.slice(0, 5).map((item, idx) => {
           const active = getActiveTabClass(item.path);
+          const Icon = item.icon;
           return (
             <button
               key={idx}
               onClick={() => navigate(item.path)}
-              className="flex flex-col items-center justify-center gap-1 transition-all duration-200 flex-1 relative"
+              className="flex flex-col items-center justify-center gap-1 transition-all duration-200 flex-1"
             >
-              {active ? (
-                <div className="flex flex-col items-center justify-center">
-                  <div className="px-5 py-1.5 bg-[#FFEBE7] rounded-full flex items-center justify-center shadow-sm">
-                    <item.icon size={20} className="text-[#E06651]" />
-                  </div>
-                  <span className="text-[10px] font-bold text-carbon-800 font-poppins mt-0.5">{t(item.key)}</span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center">
-                  <div className="px-5 py-1.5 text-carbon-400">
-                    <item.icon size={20} />
-                  </div>
-                  <span className="text-[10px] font-medium text-carbon-400 font-poppins mt-0.5">{t(item.key)}</span>
-                </div>
-              )}
+              <div className={active ? 'px-4 py-1.5 bg-forest-100 rounded-full flex items-center justify-center shadow-sm' : 'px-4 py-1.5 text-carbon-400'}>
+                <Icon size={20} className={active ? 'text-forest-800' : 'text-carbon-400'} />
+              </div>
+              <span className={`text-[10px] font-bold mt-0.5 ${active ? 'text-carbon-800' : 'text-carbon-400'}`}>
+                {item.name}
+              </span>
             </button>
           );
         })}
