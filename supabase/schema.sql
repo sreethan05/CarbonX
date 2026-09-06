@@ -1,13 +1,33 @@
 -- ==============================================================================
--- CarbonX - Complete Supabase Database Schema & Migration Script
--- Single unified file containing all tables, column migrations, RLS, and grants.
--- Safe to run on a brand new database OR an existing database in Supabase SQL Editor.
+-- CarbonX - Unified Supabase Database Schema (Complete All-in-One)
+-- Preserves both new tables (corporates, fpos) and old tables (kyc_verifications),
+-- upgrades marketplace_listings, and sets up full permissions.
+-- Zero destructive operations (NO DROPS). Safe to run anytime.
 -- ==============================================================================
 
 -- 1. EXTENSIONS
 create extension if not exists pgcrypto;
 
--- 2. PROFILES TABLE
+-- 2. FPOS TABLE (New system)
+create table if not exists public.fpos (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  registration_no text unique,
+  password text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 3. CORPORATES TABLE (New system)
+create table if not exists public.corporates (
+  c_id uuid primary key default gen_random_uuid(),
+  name text not null,
+  password_hash text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 4. PROFILES TABLE
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   phone text not null unique,
@@ -20,18 +40,20 @@ create table if not exists public.profiles (
   role text not null default 'farmer' check (role in ('farmer', 'buyer', 'verifier', 'admin')),
   wallet_address text,
   preferred_language text not null default 'en',
+  fpo_id uuid references public.fpos(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- Ensure profiles columns exist if table was previously created with older schema
+-- Ensure profiles columns exist if created earlier
 alter table public.profiles add column if not exists role text not null default 'farmer';
 alter table public.profiles add column if not exists preferred_language text not null default 'en';
 alter table public.profiles add column if not exists wallet_address text;
 alter table public.profiles add column if not exists upi text default '';
 alter table public.profiles add column if not exists aadhaar_last4 text default '';
+alter table public.profiles add column if not exists fpo_id uuid references public.fpos(id) on delete set null;
 
--- 3. OTP CODES TABLE
+-- 5. OTP CODES TABLE
 create table if not exists public.otp_codes (
   phone text primary key,
   otp text not null,
@@ -39,7 +61,7 @@ create table if not exists public.otp_codes (
   created_at timestamptz not null default now()
 );
 
--- 4. FARMS TABLE
+-- 6. FARMS TABLE
 create table if not exists public.farms (
   id uuid primary key default gen_random_uuid(),
   owner_phone text not null references public.profiles(phone) on delete cascade,
@@ -65,7 +87,7 @@ create table if not exists public.farms (
   updated_at timestamptz not null default now()
 );
 
--- Ensure all farms columns exist if table already existed
+-- Ensure all farms columns exist
 alter table public.farms add column if not exists owner_phone text references public.profiles(phone) on delete cascade;
 alter table public.farms add column if not exists name text not null default 'My Farm';
 alter table public.farms add column if not exists crop_type text default 'Mixed Crop';
@@ -90,7 +112,7 @@ alter table public.farms add column if not exists updated_at timestamptz not nul
 create index if not exists farms_owner_phone_idx
   on public.farms(owner_phone);
 
--- 5. MARKETPLACE LISTINGS TABLE
+-- 7. MARKETPLACE LISTINGS TABLE (Upgraded with full columns)
 create table if not exists public.marketplace_listings (
   id uuid primary key default gen_random_uuid(),
   farmer_phone text not null references public.profiles(phone) on delete cascade,
@@ -115,7 +137,7 @@ create table if not exists public.marketplace_listings (
   updated_at timestamptz not null default now()
 );
 
--- Crucial: Add missing columns if marketplace_listings was previously created with fewer columns
+-- Ensure all columns exist on marketplace_listings
 alter table public.marketplace_listings add column if not exists farmer_phone text references public.profiles(phone) on delete cascade;
 alter table public.marketplace_listings add column if not exists farm_id uuid references public.farms(id) on delete set null;
 alter table public.marketplace_listings add column if not exists farmer_name text not null default '';
@@ -141,7 +163,7 @@ create index if not exists marketplace_listings_farmer_phone_idx
 create index if not exists marketplace_listings_status_idx
   on public.marketplace_listings(status);
 
--- 6. KYC VERIFICATIONS TABLE
+-- 8. KYC VERIFICATIONS TABLE (Brought from old database)
 create table if not exists public.kyc_verifications (
   id uuid primary key default gen_random_uuid(),
   owner_phone text not null references public.profiles(phone) on delete cascade,
@@ -165,24 +187,27 @@ create index if not exists kyc_verifications_owner_phone_idx
 create index if not exists kyc_verifications_document_sha256_idx
   on public.kyc_verifications(document_sha256);
 
--- 7. ROW LEVEL SECURITY (RLS)
+-- 9. ROW LEVEL SECURITY (RLS)
 alter table public.profiles enable row level security;
 alter table public.otp_codes enable row level security;
 alter table public.farms enable row level security;
 alter table public.marketplace_listings enable row level security;
 alter table public.kyc_verifications enable row level security;
+alter table public.corporates enable row level security;
+alter table public.fpos enable row level security;
 
--- 8. SERVICE ROLE PERMISSIONS (Full backend access)
+-- 10. PERMISSIONS (Grant full access to service_role)
 grant usage on schema public to service_role;
 grant select, insert, update, delete on table
   public.profiles,
   public.otp_codes,
   public.farms,
   public.marketplace_listings,
-  public.kyc_verifications
+  public.kyc_verifications,
+  public.corporates,
+  public.fpos
 to service_role;
 
--- Optional: Allow read access for authenticated / anon users if needed
 grant usage on schema public to anon, authenticated;
 grant select on table
   public.profiles,
@@ -190,8 +215,8 @@ grant select on table
   public.marketplace_listings
 to anon, authenticated;
 
--- 9. NOTIFY COMPLETION
+-- 11. COMPLETION
 do $$
 begin
-  raise notice 'CarbonX schema migration completed successfully!';
+  raise notice 'CarbonX all-in-one schema update completed successfully!';
 end $$;
