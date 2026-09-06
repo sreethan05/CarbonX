@@ -74,7 +74,7 @@
 }
 
 .leaflet-bar a {
-  background-color: #ffffff !apply;
+  background-color: #ffffff !important;
   border-bottom: 1px solid #F5F5E9 !important;
   color: #263238 !important;
   transition: all 0.2s;
