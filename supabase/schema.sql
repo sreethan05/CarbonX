@@ -1,14 +1,21 @@
 -- ==============================================================================
--- CarbonX - Unified Supabase Database Schema (Complete All-in-One)
--- Preserves both new tables (corporates, fpos) and old tables (kyc_verifications),
--- upgrades marketplace_listings, and sets up full permissions.
--- Zero destructive operations (NO DROPS). Safe to run anytime.
+-- 3. ALL-IN-ONE UNIFIED SCHEMA (Sreethan Core MRV + Hasini FPO/Corporate)
+-- Unified Master Database Migration for CarbonX
+-- Safe to run on any new or existing Supabase project. Zero destructive operations.
+-- Includes all 7 tables:
+--   1. fpos
+--   2. corporates
+--   3. profiles (with fpo_id)
+--   4. otp_codes
+--   5. farms (with full satellite & biodiversity columns)
+--   6. marketplace_listings (with full carbon/bio credits & corporate trading)
+--   7. kyc_verifications (with full document hash & geocoding)
 -- ==============================================================================
 
 -- 1. EXTENSIONS
 create extension if not exists pgcrypto;
 
--- 2. FPOS TABLE (New system)
+-- 2. FPOS TABLE (Farmer Producer Organizations - Hasini)
 create table if not exists public.fpos (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -18,7 +25,7 @@ create table if not exists public.fpos (
   updated_at timestamptz not null default now()
 );
 
--- 3. CORPORATES TABLE (New system)
+-- 3. CORPORATES TABLE (Corporate Buyers & ESG - Hasini)
 create table if not exists public.corporates (
   c_id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -27,7 +34,7 @@ create table if not exists public.corporates (
   updated_at timestamptz not null default now()
 );
 
--- 4. PROFILES TABLE
+-- 4. PROFILES TABLE (Combined Sreethan & Hasini)
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   phone text not null unique,
@@ -45,7 +52,6 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
--- Ensure profiles columns exist if created earlier
 alter table public.profiles add column if not exists role text not null default 'farmer';
 alter table public.profiles add column if not exists preferred_language text not null default 'en';
 alter table public.profiles add column if not exists wallet_address text;
@@ -53,7 +59,7 @@ alter table public.profiles add column if not exists upi text default '';
 alter table public.profiles add column if not exists aadhaar_last4 text default '';
 alter table public.profiles add column if not exists fpo_id uuid references public.fpos(id) on delete set null;
 
--- 5. OTP CODES TABLE
+-- 5. OTP CODES TABLE (Phone Verification)
 create table if not exists public.otp_codes (
   phone text primary key,
   otp text not null,
@@ -61,7 +67,7 @@ create table if not exists public.otp_codes (
   created_at timestamptz not null default now()
 );
 
--- 6. FARMS TABLE
+-- 6. FARMS TABLE (Satellite MRV, NDVI, EVI & Credits - Sreethan)
 create table if not exists public.farms (
   id uuid primary key default gen_random_uuid(),
   owner_phone text not null references public.profiles(phone) on delete cascade,
@@ -87,7 +93,6 @@ create table if not exists public.farms (
   updated_at timestamptz not null default now()
 );
 
--- Ensure all farms columns exist
 alter table public.farms add column if not exists owner_phone text references public.profiles(phone) on delete cascade;
 alter table public.farms add column if not exists name text not null default 'My Farm';
 alter table public.farms add column if not exists crop_type text default 'Mixed Crop';
@@ -112,7 +117,7 @@ alter table public.farms add column if not exists updated_at timestamptz not nul
 create index if not exists farms_owner_phone_idx
   on public.farms(owner_phone);
 
--- 7. MARKETPLACE LISTINGS TABLE (Upgraded with full columns)
+-- 7. MARKETPLACE LISTINGS TABLE (Full Unified Trading)
 create table if not exists public.marketplace_listings (
   id uuid primary key default gen_random_uuid(),
   farmer_phone text not null references public.profiles(phone) on delete cascade,
@@ -137,7 +142,6 @@ create table if not exists public.marketplace_listings (
   updated_at timestamptz not null default now()
 );
 
--- Ensure all columns exist on marketplace_listings
 alter table public.marketplace_listings add column if not exists farmer_phone text references public.profiles(phone) on delete cascade;
 alter table public.marketplace_listings add column if not exists farm_id uuid references public.farms(id) on delete set null;
 alter table public.marketplace_listings add column if not exists farmer_name text not null default '';
@@ -163,7 +167,7 @@ create index if not exists marketplace_listings_farmer_phone_idx
 create index if not exists marketplace_listings_status_idx
   on public.marketplace_listings(status);
 
--- 8. KYC VERIFICATIONS TABLE (Brought from old database)
+-- 8. KYC VERIFICATIONS TABLE (Land Document Verification - Sreethan)
 create table if not exists public.kyc_verifications (
   id uuid primary key default gen_random_uuid(),
   owner_phone text not null references public.profiles(phone) on delete cascade,
@@ -196,7 +200,7 @@ alter table public.kyc_verifications enable row level security;
 alter table public.corporates enable row level security;
 alter table public.fpos enable row level security;
 
--- 10. PERMISSIONS (Grant full access to service_role)
+-- 10. FULL SERVICE ROLE & CLIENT ACCESS
 grant usage on schema public to service_role;
 grant select, insert, update, delete on table
   public.profiles,
@@ -218,5 +222,5 @@ to anon, authenticated;
 -- 11. COMPLETION
 do $$
 begin
-  raise notice 'CarbonX all-in-one schema update completed successfully!';
+  raise notice 'CarbonX all-in-one unified schema applied successfully!';
 end $$;
