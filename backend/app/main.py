@@ -25,7 +25,7 @@ app = FastAPI(title="CarbonX API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -132,6 +132,7 @@ class RegisterModel(BaseModel):
     district: str
     village: str
     upi: str
+    role: Optional[str] = "farmer"
     preferred_language: Optional[str] = "en"
 
 
@@ -157,6 +158,7 @@ class UpdateProfileModel(BaseModel):
     district: Optional[str] = None
     village: Optional[str] = None
     upi: Optional[str] = None
+    role: Optional[str] = None
     preferred_language: Optional[str] = None
 
 
@@ -190,10 +192,21 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     return payload
 
 
+def require_role(*allowed_roles):
+    """Dependency factory: only allow users with one of the specified roles."""
+    def _check(current_user: dict = Depends(get_current_user)):
+        role = current_user.get("role", "farmer")
+        if role not in allowed_roles:
+            raise HTTPException(status_code=403, detail=f"Access denied. Required role: {', '.join(allowed_roles)}")
+        return current_user
+    return _check
+
+
 def _user_response(user: dict, phone: str):
     return {
         "phone": phone,
         "name": user.get("name", ""),
+        "role": user.get("role", "farmer"),
         "state": user.get("state", ""),
         "district": user.get("district", ""),
         "village": user.get("village", ""),
@@ -217,7 +230,7 @@ def _send_otp_flow(phone: str):
 def root():
     return {
         "message": "CarbonX API running",
-        "version": "4.0",
+        "version": "5.0",
         "supabase": db.is_ready(),
         "twilio": _twilio_ready(),
         "earth_engine": earth_engine_ready,
@@ -258,6 +271,7 @@ def register(data: RegisterModel):
             return {"success": False, "message": "Invalid or expired OTP"}
         existing = _get_user(phone)
         lang = (data.preferred_language or "en")[:2]
+        role = data.role or "farmer"
         if existing:
             db.update_profile(phone, {
                 "name": data.name or existing.get("name"),
@@ -267,9 +281,10 @@ def register(data: RegisterModel):
                 "upi": data.upi,
                 "aadhaar_last4": data.aadhaar[-4:],
                 "preferred_language": lang,
+                "role": role,
             })
             user = _get_user(phone)
-            token = create_access_token({"phone": phone, "name": user.get("name", "")})
+            token = create_access_token({"phone": phone, "name": user.get("name", ""), "role": user.get("role", "farmer")})
             return {
                 "success": True,
                 "message": "Profile updated, logged in",
@@ -285,10 +300,10 @@ def register(data: RegisterModel):
             "village": data.village,
             "upi": data.upi,
             "preferred_language": lang,
-            "role": "farmer",
+            "role": role,
         }
         _save_user(user)
-        token = create_access_token({"phone": phone, "name": data.name})
+        token = create_access_token({"phone": phone, "name": data.name, "role": role})
         return {
             "success": True,
             "message": "Registration successful",
@@ -327,7 +342,7 @@ def login(data: LoginOtpModel):
         user = _get_user(phone)
         if not user:
             return {"success": False, "message": "Phone not registered"}
-        token = create_access_token({"phone": phone, "name": user.get("name", "")})
+        token = create_access_token({"phone": phone, "name": user.get("name", ""), "role": user.get("role", "farmer")})
         return {"success": True, "token": token, "user": _user_response(user, phone)}
     except HTTPException:
         raise
@@ -431,7 +446,8 @@ def get_me(current_user: dict = Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     farms = _get_user_farms(phone)
-    return {"success": True, "user": _user_response(user, phone), "farms": farms}
+    kyc = db.get_kyc_status(phone) if db.is_ready() else None
+    return {"success": True, "user": _user_response(user, phone), "farms": farms, "kyc": kyc}
 
 
 @app.patch("/profile")
