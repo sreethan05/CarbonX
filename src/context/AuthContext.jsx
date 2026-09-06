@@ -11,8 +11,8 @@ export function AuthProvider({ children }) {
   const [farms, setFarms] = useState(() => {
     try { return JSON.parse(localStorage.getItem('carbonx_farms') || '[]'); } catch { return []; }
   });
-  const [wallet, setWallet] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('carbonx_wallet') || 'null'); } catch { return null; }
+  const [kyc, setKyc] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('carbonx_kyc') || 'null'); } catch { return null; }
   });
   const [loading, setLoading] = useState(false);
 
@@ -27,8 +27,10 @@ export function AuthProvider({ children }) {
       if (data.success) {
         setUser(data.user);
         setFarms(data.farms || []);
+        setKyc(data.kyc || null);
         localStorage.setItem('carbonx_user', JSON.stringify(data.user));
         localStorage.setItem('carbonx_farms', JSON.stringify(data.farms || []));
+        localStorage.setItem('carbonx_kyc', JSON.stringify(data.kyc || null));
         if (data.user?.preferred_language) {
           localStorage.setItem('carbonx_lang', data.user.preferred_language);
         }
@@ -53,8 +55,10 @@ export function AuthProvider({ children }) {
       if (data.success) {
         setUser(data.user);
         setFarms(data.farms || []);
+        setKyc(data.kyc || null);
         localStorage.setItem('carbonx_user', JSON.stringify(data.user));
         localStorage.setItem('carbonx_farms', JSON.stringify(data.farms || []));
+        localStorage.setItem('carbonx_kyc', JSON.stringify(data.kyc || null));
         if (data.user?.preferred_language) {
           localStorage.setItem('carbonx_lang', data.user.preferred_language);
         }
@@ -68,10 +72,11 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     setFarms([]);
-    setWallet(null);
+    setKyc(null);
     localStorage.removeItem('carbonx_token');
     localStorage.removeItem('carbonx_user');
     localStorage.removeItem('carbonx_farms');
+    localStorage.removeItem('carbonx_kyc');
   }
 
   function addFarm(farm) {
@@ -80,20 +85,18 @@ export function AuthProvider({ children }) {
     localStorage.setItem('carbonx_farms', JSON.stringify(updated));
   }
 
-  function updateWallet(data) {
-    setWallet(data);
-    localStorage.setItem('carbonx_wallet', JSON.stringify(data));
-  }
-
   function setUserProfile(profile) {
     setUser(profile);
     localStorage.setItem('carbonx_user', JSON.stringify(profile));
   }
 
+  const role = user?.role || 'farmer';
+  const isAuthenticated = !!token && !!user;
+
   return (
     <AuthContext.Provider value={{
-      user, token, farms, wallet, loading,
-      login, logout, addFarm, updateWallet, refreshUser, setUserProfile,
+      user, token, farms, kyc, role, isAuthenticated, loading,
+      login, logout, addFarm, refreshUser, setUserProfile,
     }}>
       {children}
     </AuthContext.Provider>
