@@ -1,7 +1,7 @@
 -- ==============================================================================
--- CarbonX - Complete Supabase Database Schema
--- Single unified file containing all tables, indexes, RLS, and permissions.
--- Safe to run on a new database or an existing database in the Supabase SQL Editor.
+-- CarbonX - Complete Supabase Database Schema & Migration Script
+-- Single unified file containing all tables, column migrations, RLS, and grants.
+-- Safe to run on a brand new database OR an existing database in Supabase SQL Editor.
 -- ==============================================================================
 
 -- 1. EXTENSIONS
@@ -24,10 +24,12 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
--- Ensure columns exist if table was previously created with older schema
+-- Ensure profiles columns exist if table was previously created with older schema
 alter table public.profiles add column if not exists role text not null default 'farmer';
 alter table public.profiles add column if not exists preferred_language text not null default 'en';
 alter table public.profiles add column if not exists wallet_address text;
+alter table public.profiles add column if not exists upi text default '';
+alter table public.profiles add column if not exists aadhaar_last4 text default '';
 
 -- 3. OTP CODES TABLE
 create table if not exists public.otp_codes (
@@ -44,7 +46,7 @@ create table if not exists public.farms (
   name text not null default 'My Farm',
   crop_type text default 'Mixed Crop',
   irrigation text default 'Drip',
-  geojson jsonb not null,
+  geojson jsonb not null default '{}'::jsonb,
   area_hectares numeric not null default 0,
   ndvi numeric default 0,
   evi numeric default 0,
@@ -62,6 +64,28 @@ create table if not exists public.farms (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Ensure all farms columns exist if table already existed
+alter table public.farms add column if not exists owner_phone text references public.profiles(phone) on delete cascade;
+alter table public.farms add column if not exists name text not null default 'My Farm';
+alter table public.farms add column if not exists crop_type text default 'Mixed Crop';
+alter table public.farms add column if not exists irrigation text default 'Drip';
+alter table public.farms add column if not exists geojson jsonb not null default '{}'::jsonb;
+alter table public.farms add column if not exists area_hectares numeric not null default 0;
+alter table public.farms add column if not exists ndvi numeric default 0;
+alter table public.farms add column if not exists evi numeric default 0;
+alter table public.farms add column if not exists carbon_tonnes numeric default 0;
+alter table public.farms add column if not exists biodiversity_score numeric default 0;
+alter table public.farms add column if not exists biodiversity_credits numeric default 0;
+alter table public.farms add column if not exists total_credits numeric default 0;
+alter table public.farms add column if not exists tree_cover numeric default 0;
+alter table public.farms add column if not exists soil_moisture numeric default 0;
+alter table public.farms add column if not exists vegetation_health text default '';
+alter table public.farms add column if not exists ai_confidence numeric default 0;
+alter table public.farms add column if not exists satellite_source text default '';
+alter table public.farms add column if not exists status text not null default 'Verified';
+alter table public.farms add column if not exists token_id text;
+alter table public.farms add column if not exists updated_at timestamptz not null default now();
 
 create index if not exists farms_owner_phone_idx
   on public.farms(owner_phone);
@@ -91,6 +115,27 @@ create table if not exists public.marketplace_listings (
   updated_at timestamptz not null default now()
 );
 
+-- Crucial: Add missing columns if marketplace_listings was previously created with fewer columns
+alter table public.marketplace_listings add column if not exists farmer_phone text references public.profiles(phone) on delete cascade;
+alter table public.marketplace_listings add column if not exists farm_id uuid references public.farms(id) on delete set null;
+alter table public.marketplace_listings add column if not exists farmer_name text not null default '';
+alter table public.marketplace_listings add column if not exists location text default '';
+alter table public.marketplace_listings add column if not exists crop text default 'Mixed Crop';
+alter table public.marketplace_listings add column if not exists size_label text default '';
+alter table public.marketplace_listings add column if not exists carbon_credits numeric not null default 0;
+alter table public.marketplace_listings add column if not exists biodiversity_credits numeric not null default 0;
+alter table public.marketplace_listings add column if not exists total_credits numeric not null default 0;
+alter table public.marketplace_listings add column if not exists price_per_credit numeric not null default 520;
+alter table public.marketplace_listings add column if not exists current_bid numeric not null default 0;
+alter table public.marketplace_listings add column if not exists bids_count integer not null default 0;
+alter table public.marketplace_listings add column if not exists status text not null default 'Active';
+alter table public.marketplace_listings add column if not exists listing_model text default '';
+alter table public.marketplace_listings add column if not exists token_id text;
+alter table public.marketplace_listings add column if not exists tx_hash text;
+alter table public.marketplace_listings add column if not exists image_url text;
+alter table public.marketplace_listings add column if not exists expires_at timestamptz;
+alter table public.marketplace_listings add column if not exists updated_at timestamptz not null default now();
+
 create index if not exists marketplace_listings_farmer_phone_idx
   on public.marketplace_listings(farmer_phone);
 create index if not exists marketplace_listings_status_idx
@@ -104,11 +149,16 @@ create table if not exists public.kyc_verifications (
   reasons jsonb not null default '[]'::jsonb,
   checks jsonb not null default '{}'::jsonb,
   extracted_fields jsonb not null default '{}'::jsonb,
-  document_name text not null,
+  document_name text not null default 'document.png',
   document_sha256 text not null,
   perceptual_hash text,
   created_at timestamptz not null default now()
 );
+
+alter table public.kyc_verifications add column if not exists document_name text not null default 'document.png';
+alter table public.kyc_verifications add column if not exists reasons jsonb not null default '[]'::jsonb;
+alter table public.kyc_verifications add column if not exists checks jsonb not null default '{}'::jsonb;
+alter table public.kyc_verifications add column if not exists extracted_fields jsonb not null default '{}'::jsonb;
 
 create index if not exists kyc_verifications_owner_phone_idx
   on public.kyc_verifications(owner_phone, created_at desc);
@@ -132,8 +182,16 @@ grant select, insert, update, delete on table
   public.kyc_verifications
 to service_role;
 
+-- Optional: Allow read access for authenticated / anon users if needed
+grant usage on schema public to anon, authenticated;
+grant select on table
+  public.profiles,
+  public.farms,
+  public.marketplace_listings
+to anon, authenticated;
+
 -- 9. NOTIFY COMPLETION
 do $$
 begin
-  raise notice 'CarbonX schema setup/update completed successfully!';
+  raise notice 'CarbonX schema migration completed successfully!';
 end $$;
