@@ -41,7 +41,7 @@ def health_check() -> dict:
     if not sb:
         return {"ready": False, "tables": {}, "message": "Supabase client is not configured"}
     tables = {}
-    for table in ("profiles", "farms", "marketplace_listings", "otp_codes"):
+    for table in ("profiles", "farms", "marketplace_listings", "otp_codes", "kyc_verifications"):
         try:
             sb.table(table).select("*").limit(1).execute()
             tables[table] = True

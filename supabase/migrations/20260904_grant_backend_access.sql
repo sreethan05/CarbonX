@@ -6,5 +6,6 @@ grant select, insert, update, delete on table
   public.profiles,
   public.otp_codes,
   public.farms,
-  public.marketplace_listings
+  public.marketplace_listings,
+  public.kyc_verifications
 to service_role;
