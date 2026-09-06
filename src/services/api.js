@@ -55,6 +55,16 @@ export async function updateProfile(fields) {
   return patch(`${PY}/profile`, fields);
 }
 
+// ── KYC ──
+
+export async function verifyLandDocument(payload) {
+  return post(`${PY}/verify-land`, payload);
+}
+
+export async function getKycStatus(phone) {
+  return get(`${PY}/kyc/status/${phone}`);
+}
+
 // ── Farms & satellite (GEE + ML) ──
 
 export async function analyzeFarm(geojson, farmName, cropType, irrigation) {
@@ -68,10 +78,6 @@ export async function analyzeFarm(geojson, farmName, cropType, irrigation) {
 
 export async function saveFarm(farm) {
   return post(`${PY}/save-farm`, { farm });
-}
-
-export async function verifyLandDocument(payload) {
-  return post(`${PY}/verify-land`, payload);
 }
 
 export async function predictBiodiversity(longitude, latitude) {
