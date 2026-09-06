@@ -93,8 +93,15 @@ export default function FarmerRegister() {
     try {
       const res = await registerUser({
         phone: phone.replace(/\D/g, ''),
-        name, aadhaar, state, district, village, upi: upiId,
-        role: selectedRole, preferred_language: currentLang,
+        otp,
+        name,
+        aadhaar,
+        state,
+        district,
+        village,
+        upi: upiId,
+        role: selectedRole,
+        preferred_language: currentLang,
       });
       if (res.success) {
         await login(res.token, res.user);
@@ -115,7 +122,7 @@ export default function FarmerRegister() {
           <button onClick={() => navigate('/')} className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700">
             <ArrowLeft size={16} />
           </button>
-          <span className="font-manrope font-extrabold text-lg text-forest-800">CarbonX</span>
+          <span className="font-manrope font-extrabold text-lg text-forest-800 cursor-pointer" onClick={() => navigate('/')}>CarbonX</span>
           <span className="text-[10px] bg-forest-50 text-forest-700 px-2 py-0.5 rounded-lg font-bold uppercase">{roleLabel}</span>
         </div>
         <div className="flex items-center gap-1.5 bg-forest-50/80 border border-forest-100 rounded-xl px-2.5 py-1 text-xs font-semibold">
@@ -129,6 +136,11 @@ export default function FarmerRegister() {
       </header>
 
       <main className="flex-1 max-w-md mx-auto w-full px-4 py-8 flex flex-col justify-center">
+        <div className="bg-forest-100/70 p-1 rounded-2xl flex gap-1 mb-6 border border-forest-200/50">
+          <button type="button" onClick={() => navigate('/farmer-login')} className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all text-carbon-500 hover:text-forest-900 hover:bg-white/50">Sign In</button>
+          <button type="button" className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all bg-white text-forest-900 shadow-sm">Register New Account</button>
+        </div>
+
         <div className="flex items-center gap-1.5 mb-6">
           {[1,2,3,4].map(s => (
             <div key={s} className={`h-1.5 rounded-full transition-all ${step >= s ? 'flex-1 bg-forest-600' : 'w-1.5 bg-forest-200'}`} />
@@ -161,6 +173,15 @@ export default function FarmerRegister() {
                 <button type="submit" className="w-full bg-forest-800 text-white text-xs font-bold py-4 rounded-2xl flex items-center justify-center gap-2">Verify & Continue <ArrowRight size={14} /></button>
               </form>
             )}
+
+            <div className="pt-3 border-t border-forest-50 text-center">
+              <p className="text-xs text-carbon-500">
+                Already have an account?{' '}
+                <button type="button" onClick={() => navigate('/farmer-login')} className="text-forest-700 font-bold hover:underline">
+                  Sign in here
+                </button>
+              </p>
+            </div>
           </div>
         )}
 

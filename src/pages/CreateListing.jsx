@@ -26,12 +26,16 @@ export default function CreateListing() {
     setLoading(true);
     try {
       const farm = farms[0];
+      const carbonRatio = totals.total > 0 ? (totals.carbon / totals.total) : 0.8;
+      const carbonCredits = Math.round(creditsToSell * carbonRatio * 100) / 100;
+      const bioCredits = Math.round((creditsToSell - carbonCredits) * 100) / 100;
+
       const res = await createMarketplaceListing({
-        farm_id: farm?.id,
-        credits: creditsToSell,
+        farm_id: farm?.id || null,
+        carbon_credits: carbonCredits,
+        biodiversity_credits: bioCredits,
         price_per_credit: pricePerCredit,
-        crop: farm?.crop_type || 'Carbon Credits',
-        location: [farm?.village, farm?.district].filter(Boolean).join(', '),
+        crop: farm?.crop_type || 'Mixed Crop',
       });
       if (res.success) {
         setSuccess(true);

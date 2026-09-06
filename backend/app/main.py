@@ -163,8 +163,9 @@ class UpdateProfileModel(BaseModel):
 
 
 class CreateListingModel(BaseModel):
-    carbon_credits: float
-    biodiversity_credits: float
+    carbon_credits: Optional[float] = None
+    biodiversity_credits: Optional[float] = None
+    credits: Optional[float] = None
     price_per_credit: float = 520
     farm_id: Optional[str] = None
     crop: Optional[str] = ""
@@ -173,8 +174,8 @@ class CreateListingModel(BaseModel):
 
 
 class LandVerificationModel(BaseModel):
-    document_name: str
-    document_content_base64: str
+    document_name: Optional[str] = "document.png"
+    document_content_base64: Optional[str] = ""
     extracted_text: Optional[str] = ""
     survey_number: Optional[str] = ""
     village: Optional[str] = ""
@@ -608,15 +609,23 @@ def create_listing(data: CreateListingModel, current_user: dict = Depends(get_cu
         user = _get_user(phone)
         if not user:
             return {"success": False, "message": "User not found"}
-        total = round(float(data.carbon_credits) + float(data.biodiversity_credits), 2)
+        c_credits = data.carbon_credits
+        b_credits = data.biodiversity_credits
+        if c_credits is None and b_credits is None and data.credits is not None:
+            c_credits = round(float(data.credits) * 0.8, 2)
+            b_credits = round(float(data.credits) * 0.2, 2)
+        else:
+            c_credits = float(c_credits or 0)
+            b_credits = float(b_credits or 0)
+        total = round(c_credits + b_credits, 2)
         listing = {
             "farmer_phone": phone,
             "farmer_name": user.get("name", "Farmer"),
             "location": f"{user.get('village', '')}, {user.get('district', '')}".strip(", "),
             "crop": data.crop or "Mixed Crop",
             "size_label": "",
-            "carbon_credits": data.carbon_credits,
-            "biodiversity_credits": data.biodiversity_credits,
+            "carbon_credits": c_credits,
+            "biodiversity_credits": b_credits,
             "total_credits": total,
             "price_per_credit": data.price_per_credit,
             "current_bid": data.price_per_credit * total,
