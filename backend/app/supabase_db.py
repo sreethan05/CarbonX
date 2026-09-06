@@ -98,6 +98,23 @@ def insert_kyc_verification(record: dict) -> Optional[dict]:
     return rows[0] if rows else None
 
 
+def get_kyc_status(phone: str) -> Optional[dict]:
+    """Fetch the most recent KYC verification record for a phone number."""
+    sb = _client()
+    if not sb:
+        return None
+    res = (
+        sb.table("kyc_verifications")
+        .select("*")
+        .eq("owner_phone", phone)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
 def store_otp(phone: str, otp: str, expires_at: datetime) -> bool:
     sb = _client()
     if not sb:
