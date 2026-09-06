@@ -1,9 +1,13 @@
--- CarbonX initial Supabase schema
--- Run this migration on a new Supabase project before
--- 20260524_preferred_language.sql (which is safe to re-run).
+-- ==============================================================================
+-- CarbonX - Complete Supabase Database Schema
+-- Single unified file containing all tables, indexes, RLS, and permissions.
+-- Safe to run on a new database or an existing database in the Supabase SQL Editor.
+-- ==============================================================================
 
+-- 1. EXTENSIONS
 create extension if not exists pgcrypto;
 
+-- 2. PROFILES TABLE
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   phone text not null unique,
@@ -13,15 +17,19 @@ create table if not exists public.profiles (
   village text default '',
   upi text default '',
   aadhaar_last4 text default '',
-  role text not null default 'farmer',
+  role text not null default 'farmer' check (role in ('farmer', 'buyer', 'verifier', 'admin')),
   wallet_address text,
   preferred_language text not null default 'en',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- No foreign key to profiles: registration OTPs are issued before a profile
--- exists, and expired/used codes are deleted by the backend.
+-- Ensure columns exist if table was previously created with older schema
+alter table public.profiles add column if not exists role text not null default 'farmer';
+alter table public.profiles add column if not exists preferred_language text not null default 'en';
+alter table public.profiles add column if not exists wallet_address text;
+
+-- 3. OTP CODES TABLE
 create table if not exists public.otp_codes (
   phone text primary key,
   otp text not null,
@@ -29,6 +37,7 @@ create table if not exists public.otp_codes (
   created_at timestamptz not null default now()
 );
 
+-- 4. FARMS TABLE
 create table if not exists public.farms (
   id uuid primary key default gen_random_uuid(),
   owner_phone text not null references public.profiles(phone) on delete cascade,
@@ -54,6 +63,10 @@ create table if not exists public.farms (
   updated_at timestamptz not null default now()
 );
 
+create index if not exists farms_owner_phone_idx
+  on public.farms(owner_phone);
+
+-- 5. MARKETPLACE LISTINGS TABLE
 create table if not exists public.marketplace_listings (
   id uuid primary key default gen_random_uuid(),
   farmer_phone text not null references public.profiles(phone) on delete cascade,
@@ -78,16 +91,49 @@ create table if not exists public.marketplace_listings (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists farms_owner_phone_idx
-  on public.farms(owner_phone);
 create index if not exists marketplace_listings_farmer_phone_idx
   on public.marketplace_listings(farmer_phone);
 create index if not exists marketplace_listings_status_idx
   on public.marketplace_listings(status);
 
--- The current application reads and writes through the FastAPI backend using
--- Supabase's service-role key. Keep direct browser access blocked by default.
+-- 6. KYC VERIFICATIONS TABLE
+create table if not exists public.kyc_verifications (
+  id uuid primary key default gen_random_uuid(),
+  owner_phone text not null references public.profiles(phone) on delete cascade,
+  status text not null check (status in ('VERIFIED', 'FLAGGED')),
+  reasons jsonb not null default '[]'::jsonb,
+  checks jsonb not null default '{}'::jsonb,
+  extracted_fields jsonb not null default '{}'::jsonb,
+  document_name text not null,
+  document_sha256 text not null,
+  perceptual_hash text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists kyc_verifications_owner_phone_idx
+  on public.kyc_verifications(owner_phone, created_at desc);
+create index if not exists kyc_verifications_document_sha256_idx
+  on public.kyc_verifications(document_sha256);
+
+-- 7. ROW LEVEL SECURITY (RLS)
 alter table public.profiles enable row level security;
 alter table public.otp_codes enable row level security;
 alter table public.farms enable row level security;
 alter table public.marketplace_listings enable row level security;
+alter table public.kyc_verifications enable row level security;
+
+-- 8. SERVICE ROLE PERMISSIONS (Full backend access)
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table
+  public.profiles,
+  public.otp_codes,
+  public.farms,
+  public.marketplace_listings,
+  public.kyc_verifications
+to service_role;
+
+-- 9. NOTIFY COMPLETION
+do $$
+begin
+  raise notice 'CarbonX schema setup/update completed successfully!';
+end $$;
