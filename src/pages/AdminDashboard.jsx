@@ -23,19 +23,18 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mockAdmin } from '../data/mockData';
+
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [queue, setQueue] = useState([]);
-  const [revenue, setRevenue] = useState(mockAdmin.revenueMetrics);
-  const [approvedCount, setApprovedCount] = useState(mockAdmin.totalFarmsApproved);
-  const [activeDetections, setActiveDetections] = useState(mockAdmin.activeDetections);
+  const [revenue, setRevenue] = useState({ totalVolume: 0, blockchainGasAverage: '0.001 ETH' });
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [activeDetections, setActiveDetections] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
 
   // Load and enrich the manual review queue
   useEffect(() => {
-    // Check if Ramesh Kumar's onboarding verification is completed in localStorage
     const rameshVerified = localStorage.getItem('carbonx_farmer_docs_verified') === 'true';
 
     const baseQueue = [
@@ -55,7 +54,7 @@ export default function AdminDashboard() {
           bank: "sbi_cheque_ranga.jpg",
           upiId: "ranga.rao@oksbi",
           cropPhotos: "paddy_field_geotag.jpg",
-          gps: "17.1512° N, 79.1623° E"
+          gps: "17.1512 N, 79.1623 E"
         },
         ocrMetrics: {
           nameMatch: "94.2% (Matches Database)",
@@ -84,7 +83,7 @@ export default function AdminDashboard() {
           bank: "cbi_passbook.jpg",
           upiId: "chennappa@okaxis",
           cropPhotos: "cotton_geotag.jpg",
-          gps: "16.7321° N, 78.0054° E"
+          gps: "16.7321 N, 78.0054 E"
         },
         ocrMetrics: {
           nameMatch: "81.5% (Deed lists 'M. Chennaiah' vs Aadhaar 'M. Chennappa')",
@@ -113,7 +112,7 @@ export default function AdminDashboard() {
           bank: "hdfc_passbook.jpg",
           upiId: "lakshmi.p@okhdfc",
           cropPhotos: "teak_geotag.jpg",
-          gps: "17.2452° N, 80.1425° E"
+          gps: "17.2452 N, 80.1425 E"
         },
         ocrMetrics: {
           nameMatch: "98.9% (Perfect match)",
@@ -128,7 +127,6 @@ export default function AdminDashboard() {
       }
     ];
 
-    // Prepend Ramesh's live uploads if available, or put a draft
     const rameshItem = {
       id: "q_ramesh",
       farmer: "Ramesh Kumar",
@@ -145,7 +143,7 @@ export default function AdminDashboard() {
         bank: "upi_verification.jpg",
         upiId: "ramesh.kumar@oksbi",
         cropPhotos: "geotagged_rice_field.jpg",
-        gps: "17.9620° N, 79.5982° E"
+        gps: "17.9620 N, 79.5982 E"
       },
       ocrMetrics: {
         nameMatch: "99.4% (Aadhaar & Bank KYC Match)",
@@ -184,93 +182,69 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto bg-warm-white min-h-screen text-carbon-900 font-inter">
+    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
       
       {/* Top Title Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-white p-4 rounded-[28px] border border-forest-100 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-white p-4 rounded-2xl border border-forest-100 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-rose-500/10 text-rose-600 rounded-2xl flex items-center justify-center font-bold">
+          <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center font-bold">
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] text-carbon-400 font-bold uppercase tracking-wider">CarbonX Enterprise Ops Console</span>
-            <h1 className="text-lg font-extrabold text-forest-800 font-manrope">Compliance & Governance Center</h1>
+            <span className="text-[10px] text-carbon-400 font-bold uppercase tracking-wider">Compliance Console</span>
+            <h1 className="text-lg font-extrabold text-forest-800">Verification & Governance</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] bg-rose-500/10 text-rose-600 border border-rose-500/15 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-            Level 3 Security Clearance
-          </span>
-          <span className="text-[10px] bg-forest-800 text-white px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-            ISRO-Bhuvan Node
+          <span className="text-[10px] bg-rose-50 text-rose-600 border border-rose-100 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+            Verifier Access
           </span>
         </div>
       </div>
 
       {/* Main Admin Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-5 rounded-[28px] border border-forest-100 shadow-sm"
-        >
-          <span className="text-[9px] text-carbon-400 font-bold tracking-wider uppercase">Farms Approved Globally</span>
+        <div className="bg-white p-5 rounded-2xl border border-forest-100 shadow-sm">
+          <span className="text-[9px] text-carbon-400 font-bold tracking-wider uppercase">Farms Approved</span>
           <h3 className="text-3xl font-black text-forest-800 mt-1">{approvedCount.toLocaleString()}</h3>
           <p className="text-[10px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
             <ShieldCheck size={12} /> Smart Contracts Issued
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white p-5 rounded-[28px] border border-rose-100 shadow-sm"
-        >
-          <span className="text-[9px] text-rose-500 font-bold tracking-wider uppercase flex items-center gap-1 animate-pulse">
-            ⚠️ Active Deforestation Detections
+        <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm">
+          <span className="text-[9px] text-rose-500 font-bold tracking-wider uppercase flex items-center gap-1">
+            <AlertTriangle size={11} /> Active Flags
           </span>
           <h3 className="text-3xl font-black text-rose-600 mt-1">{activeDetections}</h3>
-          <p className="text-[10px] text-rose-500 font-medium mt-1.5">Copernicus Sentinel Alert Active</p>
-        </motion.div>
+          <p className="text-[10px] text-rose-500 font-medium mt-1.5">Sentinel Alert Active</p>
+        </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-forest-900 text-white p-5 rounded-[28px] shadow-sm relative overflow-hidden"
-        >
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-white/5 border border-white/5 rounded-full flex items-center justify-center pointer-events-none opacity-40">
-            <div className="w-16 h-16 border border-white/5 rounded-full" />
-          </div>
+        <div className="bg-forest-900 text-white p-5 rounded-2xl shadow-sm relative overflow-hidden">
           <span className="text-[9px] text-forest-300 font-bold tracking-wider uppercase flex items-center gap-1">
-            <Cpu className="w-3.5 h-3.5" /> Market Clearing Volume
+            <Cpu className="w-3.5 h-3.5" /> Market Volume
           </span>
           <h3 className="text-3xl font-black text-emerald-300 mt-1">{revenue.totalVolume}</h3>
-          <p className="text-[10px] text-forest-300 font-medium mt-1.5">Avg Gas Cost: {revenue.blockchainGasAverage}</p>
-        </motion.div>
+          <p className="text-[10px] text-forest-300 font-medium mt-1.5">Avg Gas: {revenue.blockchainGasAverage}</p>
+        </div>
       </div>
 
       {/* Verification Queue header */}
       <div className="flex items-center justify-between mb-4 px-1">
-        <h4 className="text-xs font-bold text-carbon-500 uppercase tracking-wider">Manual Review Operations Queue ({queue.length})</h4>
+        <h4 className="text-xs font-bold text-carbon-500 uppercase tracking-wider">Review Queue ({queue.length})</h4>
         <span className="text-[9px] bg-forest-50 border border-forest-100 text-forest-800 px-3 py-1 rounded-full font-bold">
-          OCR RULES V2.4 • GIS-ALIGN 98%
+          OCR V2.4 · GIS-ALIGN 98%
         </span>
       </div>
 
       {/* Verification cards list */}
       <div className="space-y-4">
         {queue.length === 0 ? (
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="p-12 bg-white rounded-[32px] text-center border border-forest-100 text-carbon-500 text-sm shadow-sm"
-          >
-            <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3 animate-bounce" />
-            <p className="font-bold">Compliance Review Queue is Clear!</p>
-            <p className="text-xs text-carbon-400 mt-1">All registered farm plots successfully mapped, OCR cross-referenced, and sat-scanned.</p>
-          </motion.div>
+          <div className="p-12 bg-white rounded-2xl text-center border border-forest-100 text-carbon-500 text-sm shadow-sm">
+            <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <p className="font-bold">Review Queue is Clear</p>
+            <p className="text-xs text-carbon-400 mt-1">All farm plots verified and mapped.</p>
+          </div>
         ) : (
           queue.map((item) => {
             const isFlagged = item.status.includes('Flagged');
@@ -278,13 +252,11 @@ export default function AdminDashboard() {
             const isExpanded = expandedId === item.id;
             
             return (
-              <motion.div
+              <div
                 key={item.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`bg-white rounded-[28px] border shadow-sm transition-all duration-300 overflow-hidden ${
-                  isExpanded ? 'ring-2 ring-forest-600/25 border-forest-300 shadow-md' : 
-                  isFlagged ? 'border-rose-200 hover:border-rose-300 shadow-rose-500/[0.01]' : 'border-forest-100 hover:border-forest-200'
+                className={`bg-white rounded-2xl border shadow-sm transition-all duration-300 overflow-hidden ${
+                  isExpanded ? 'ring-2 ring-forest-400 border-forest-300 shadow-md' : 
+                  isFlagged ? 'border-rose-200 hover:border-rose-300' : 'border-forest-100 hover:border-forest-200'
                 }`}
               >
                 {/* Header Summary */}
@@ -300,15 +272,15 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <p className="text-xs text-carbon-400">
-                      Farmer: <span className="font-bold text-carbon-700">{item.farmer}</span> • Area: <span className="font-bold text-carbon-700">{item.area}</span> • Registered: <span className="font-bold text-carbon-700">{item.date}</span>
+                      Farmer: <span className="font-bold text-carbon-700">{item.farmer}</span> · Area: <span className="font-bold text-carbon-700">{item.area}</span> · {item.date}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <span className={`text-[9px] px-2.5 py-1 rounded-full font-bold uppercase ${
-                      isFlagged ? 'bg-rose-100 text-rose-800 border border-rose-200/50' : 
-                      isDraft ? 'bg-amber-100 text-amber-800 border border-amber-200/50 animate-pulse' : 
-                      'bg-forest-50 text-forest-800 border border-forest-100/50'
+                      isFlagged ? 'bg-rose-100 text-rose-800 border border-rose-200' : 
+                      isDraft ? 'bg-amber-100 text-amber-800 border border-amber-200' : 
+                      'bg-forest-50 text-forest-800 border border-forest-100'
                     }`}>
                       {item.status}
                     </span>
@@ -320,18 +292,18 @@ export default function AdminDashboard() {
                 {!isExpanded && (
                   <div className="px-5 pb-5 grid grid-cols-3 gap-2 text-xs border-t border-forest-50 pt-3">
                     <div>
-                      <span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">AI OCR Confidence</span>
+                      <span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">OCR Confidence</span>
                       <p className={`font-bold mt-0.5 ${isFlagged ? 'text-rose-600' : 'text-emerald-600'}`}>{item.confidence}</p>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">Biomass Risk Profile</span>
+                      <span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">Risk Profile</span>
                       <p className={`font-bold mt-0.5 ${item.fraudRisk.score > 50 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {item.fraudRisk.level} ({item.fraudRisk.score}%)
                       </p>
                     </div>
                     <div>
                       <span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">Action</span>
-                      <p className="font-semibold text-forest-600 mt-0.5">Click to audit docs →</p>
+                      <p className="font-semibold text-forest-600 mt-0.5">Click to audit docs</p>
                     </div>
                   </div>
                 )}
@@ -349,44 +321,44 @@ export default function AdminDashboard() {
                         
                         {/* Section 1: Uploaded Compliance Proofs */}
                         <div className="space-y-2">
-                          <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider flex items-center gap-1.5">
-                            📂 Uploaded Compliance Documents
+                          <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider">
+                            Uploaded Compliance Documents
                           </h6>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                            <div className="bg-white border border-forest-100 p-3 rounded-2xl flex flex-col justify-between h-24">
+                            <div className="bg-white border border-forest-100 p-3 rounded-xl flex flex-col justify-between h-24">
                               <span className="text-[9px] font-bold text-carbon-400">Aadhaar Card KYC</span>
                               <div className="flex items-center gap-1.5 text-xs text-forest-800 font-bold">
                                 <FileText size={14} className="text-forest-600" />
                                 <span className="truncate max-w-[120px]">{item.documents.aadhaar}</span>
                               </div>
                               <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold self-start mt-1">
-                                OCR MATCH: {item.documents.aadhaarMatch}
+                                OCR: {item.documents.aadhaarMatch}
                               </span>
                             </div>
 
-                            <div className="bg-white border border-forest-100 p-3 rounded-2xl flex flex-col justify-between h-24">
+                            <div className="bg-white border border-forest-100 p-3 rounded-xl flex flex-col justify-between h-24">
                               <span className="text-[9px] font-bold text-carbon-400">Pattadar Land Deed</span>
                               <div className="flex items-center gap-1.5 text-xs text-forest-800 font-bold">
                                 <FileText size={14} className="text-forest-600" />
                                 <span className="truncate max-w-[120px]">{item.documents.deed}</span>
                               </div>
                               <span className="text-[8px] bg-forest-50 text-forest-800 px-1.5 py-0.5 rounded font-mono font-bold self-start mt-1">
-                                DEED NO: {item.documents.deedNo}
+                                DEED: {item.documents.deedNo}
                               </span>
                             </div>
 
-                            <div className="bg-white border border-forest-100 p-3 rounded-2xl flex flex-col justify-between h-24">
+                            <div className="bg-white border border-forest-100 p-3 rounded-xl flex flex-col justify-between h-24">
                               <span className="text-[9px] font-bold text-carbon-400">Bank / UPI Verification</span>
                               <div className="flex items-center gap-1.5 text-xs text-forest-800 font-bold">
                                 <Building size={14} className="text-forest-600" />
                                 <span className="truncate max-w-[120px]">{item.documents.upiId}</span>
                               </div>
                               <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold self-start mt-1">
-                                UPI INSTANT OK
+                                UPI VERIFIED
                               </span>
                             </div>
 
-                            <div className="bg-white border border-forest-100 p-3 rounded-2xl flex flex-col justify-between h-24">
+                            <div className="bg-white border border-forest-100 p-3 rounded-xl flex flex-col justify-between h-24">
                               <span className="text-[9px] font-bold text-carbon-400">Geo-Tagged Crop Images</span>
                               <div className="flex items-center gap-1.5 text-xs text-forest-800 font-bold">
                                 <MapPin size={14} className="text-forest-600" />
@@ -400,38 +372,38 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Section 2: AI OCR Log Comparer */}
-                        <div className="bg-white border border-forest-100 rounded-2xl p-4 space-y-3">
+                        <div className="bg-white border border-forest-100 rounded-xl p-4 space-y-3">
                           <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider">
-                            🤖 AI OCR Extraction Comparer
+                            AI OCR Extraction Results
                           </h6>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                            <div className="bg-forest-50/40 p-2.5 rounded-xl border border-forest-100/50">
-                              <span className="text-[8px] uppercase tracking-wider text-carbon-400 font-bold">Aadhaar UID Identity Match</span>
+                            <div className="bg-forest-50/40 p-2.5 rounded-xl border border-forest-100">
+                              <span className="text-[8px] uppercase tracking-wider text-carbon-400 font-bold">Aadhaar Identity Match</span>
                               <p className="font-extrabold text-carbon-800 mt-1">{item.ocrMetrics.nameMatch}</p>
                             </div>
-                            <div className="bg-forest-50/40 p-2.5 rounded-xl border border-forest-100/50">
-                              <span className="text-[8px] uppercase tracking-wider text-carbon-400 font-bold">Survey Cadastral Registry Match</span>
+                            <div className="bg-forest-50/40 p-2.5 rounded-xl border border-forest-100">
+                              <span className="text-[8px] uppercase tracking-wider text-carbon-400 font-bold">Survey Registry Match</span>
                               <p className="font-extrabold text-carbon-800 mt-1">{item.ocrMetrics.surveyMatch}</p>
                             </div>
-                            <div className="bg-forest-50/40 p-2.5 rounded-xl border border-forest-100/50">
+                            <div className="bg-forest-50/40 p-2.5 rounded-xl border border-forest-100">
                               <span className="text-[8px] uppercase tracking-wider text-carbon-400 font-bold">GIS Coordinate Overlaps</span>
                               <p className="font-extrabold text-carbon-800 mt-1">{item.ocrMetrics.boundaries}</p>
                             </div>
                           </div>
                         </div>
 
-                        {/* Section 3: Deforestation & NDVI Biomass Risk meters */}
-                        <div className={`border rounded-2xl p-4 space-y-3 bg-white ${
+                        {/* Section 3: Fraud Risk Meter */}
+                        <div className={`border rounded-xl p-4 space-y-3 bg-white ${
                           item.fraudRisk.score > 50 ? 'border-rose-200' : 'border-forest-100'
                         }`}>
                           <div className="flex justify-between items-center">
-                            <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider flex items-center gap-1">
-                              📡 Copernicus Sentinel-2 Biomass & Fraud Index
+                            <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider">
+                              Satellite Biomass & Fraud Index
                             </h6>
                             <span className={`text-[10px] font-black uppercase ${
                               item.fraudRisk.score > 50 ? 'text-rose-600' : 'text-emerald-600'
                             }`}>
-                              Risk Rating: {item.fraudRisk.level}
+                              {item.fraudRisk.level}
                             </span>
                           </div>
 
@@ -446,43 +418,43 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div className="flex justify-between text-[9px] text-carbon-400 font-bold font-mono">
-                              <span>LOW RISK (0%)</span>
+                              <span>LOW (0%)</span>
                               <span>MID (50%)</span>
-                              <span>HIGH SUSPICION (100%)</span>
+                              <span>HIGH (100%)</span>
                             </div>
                           </div>
 
                           <p className={`text-xs leading-relaxed ${
-                            item.fraudRisk.score > 50 ? 'text-rose-600 bg-rose-50/30 p-2.5 rounded-xl border border-rose-100/50 font-medium' : 'text-carbon-500'
+                            item.fraudRisk.score > 50 ? 'text-rose-600 bg-rose-50/30 p-2.5 rounded-xl border border-rose-100 font-medium' : 'text-carbon-500'
                           }`}>
-                            {item.fraudRisk.score > 50 ? '🚨 ALERT: ' : '✓ '} {item.fraudRisk.details}
+                            {item.fraudRisk.score > 50 ? 'ALERT: ' : 'OK: '}{item.fraudRisk.details}
                           </p>
                         </div>
 
-                        {/* Quick Action Drawer buttons */}
+                        {/* Quick Action buttons */}
                         {!isDraft && (
-                          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-forest-100/50">
+                          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-forest-100">
                             <button
                               onClick={() => handleAction(item.id, 'reject')}
-                              className="py-3 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50/50 hover:border-rose-300 transition-all text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+                              className="py-3 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-all text-xs font-bold flex items-center justify-center gap-1.5"
                             >
                               <XCircle className="w-4 h-4 shrink-0" />
-                              <span>Reject Upload & Flag Farmer</span>
+                              <span>Reject & Flag</span>
                             </button>
 
                             <button
                               onClick={() => handleAction(item.id, 'approve')}
-                              className="py-3 rounded-xl bg-forest-800 text-white hover:bg-forest-900 transition-all text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+                              className="py-3 rounded-xl bg-forest-800 text-white hover:bg-forest-900 transition-all text-xs font-bold flex items-center justify-center gap-1.5"
                             >
                               <CheckCircle className="w-4 h-4 shrink-0" />
-                              <span>Approve Deed & Sync Ledger</span>
+                              <span>Approve & Sync Ledger</span>
                             </button>
                           </div>
                         )}
 
                         {isDraft && (
-                          <div className="bg-amber-50 border border-amber-200/50 p-3 rounded-xl text-center text-xs text-amber-800 font-medium leading-relaxed">
-                            🌾 Ramesh has not submitted his documents yet or is completing live onboarding. You can simulate uploads using the <b>Demo Override</b> in the Onboarding Flow.
+                          <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-center text-xs text-amber-800 font-medium leading-relaxed">
+                            Farmer has not submitted documents yet. Documents will appear here once KYC verification is completed.
                           </div>
                         )}
 
@@ -491,7 +463,7 @@ export default function AdminDashboard() {
                   )}
                 </AnimatePresence>
 
-              </motion.div>
+              </div>
             );
           })
         )}
