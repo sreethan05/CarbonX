@@ -1,68 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Compass, ShoppingCart, Wallet, UserCheck, Menu, Bell, Globe, X, LogOut, ShieldCheck, Building2, BadgeCheck, ClipboardList, BarChart3 } from 'lucide-react';
+import {
+  Home, Compass, ShoppingCart, Wallet, Menu, Bell, Globe, X, LogOut,
+  ShieldCheck, ClipboardList, BarChart3, Sprout, Building2, ChevronLeft,
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_NAV = {
   farmer: [
-    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
-    { name: "KYC Verification", key: "kyc", path: "/farm-verification", icon: ShieldCheck },
-    { name: "Farm Analytics", key: "farm", path: "/farm-analytics", icon: Compass },
-    { name: "Marketplace", key: "market", path: "/marketplace", icon: ShoppingCart },
-    { name: "Carbon Wallet", key: "wallet", path: "/wallet", icon: Wallet },
-    { name: "Support", key: "support", path: "/support", icon: UserCheck },
+    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'KYC Verification', path: '/farm-verification', icon: ShieldCheck },
+    { name: 'Farm Analytics', path: '/farm-analytics', icon: Compass },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
+    { name: 'Carbon Wallet', path: '/wallet', icon: Wallet },
+    { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   buyer: [
-    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
-    { name: "Marketplace", key: "market", path: "/marketplace", icon: ShoppingCart },
-    { name: "Credit Analysis", key: "analytics", path: "/farm-analytics", icon: BarChart3 },
-    { name: "Wallet", key: "wallet", path: "/wallet", icon: Wallet },
+    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
+    { name: 'Credit Analysis', path: '/farm-analytics', icon: BarChart3 },
+    { name: 'Wallet', path: '/wallet', icon: Wallet },
+    { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   verifier: [
-    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
-    { name: "Marketplace", key: "market", path: "/marketplace", icon: ClipboardList },
-    { name: "Support", key: "support", path: "/support", icon: UserCheck },
+    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
+    { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   admin: [
-    { name: "Dashboard", key: "home", path: "/dashboard", icon: Home },
-    { name: "Marketplace", key: "market", path: "/marketplace", icon: ClipboardList },
-    { name: "Support", key: "support", path: "/support", icon: UserCheck },
+    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
+    { name: 'Support', path: '/support', icon: ClipboardList },
   ],
 };
 
-const ROLE_LABELS = {
-  farmer: "Farmer",
-  buyer: "Corporate Buyer",
-  verifier: "Verifier",
-  admin: "Admin",
-};
-
-const ROLE_COLORS = {
-  farmer: "bg-emerald-50 text-emerald-700",
-  buyer: "bg-sky-50 text-sky-700",
-  verifier: "bg-amber-50 text-amber-700",
-  admin: "bg-rose-50 text-rose-700",
+const ROLE_META = {
+  farmer:  { label: 'Farmer',          classes: 'bg-forest-50 text-forest-700' },
+  buyer:   { label: 'Corporate Buyer',  classes: 'bg-sky-50 text-sky-700' },
+  verifier:{ label: 'Verifier',         classes: 'bg-amber-50 text-amber-700' },
+  admin:   { label: 'Admin',            classes: 'bg-rose-50 text-rose-700' },
 };
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, changeLanguage, currentLang } = useLanguage();
-  const { user, logout, token, role, isAuthenticated } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
+  const { user, logout, role, isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/farmer-login');
-  };
-
-  const displayName = user?.name || 'User';
-  const displayVillage = [user?.village, user?.district].filter(Boolean).join(', ') || '';
-  const initials = displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const navItems = ROLE_NAV[role] || ROLE_NAV.farmer;
+  const roleMeta = ROLE_META[role] || ROLE_META.farmer;
+
+  const displayName = user?.name || 'User';
+  const displayLocation = [user?.village, user?.district].filter(Boolean).join(', ');
+  const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
   const isPublicPage =
     location.pathname === '/' ||
@@ -70,27 +63,50 @@ export default function Layout({ children }) {
     location.pathname === '/farmer-register' ||
     location.pathname === '/farmer-login';
 
-  const getActiveTabClass = (path) => {
+  const isActive = (path) => {
     if (location.pathname === path) return true;
     if (path === '/dashboard' && location.pathname.startsWith('/dashboard')) return true;
     if (path === '/farm-analytics' && ['/farm-analytics', '/farm-map', '/farm-details', '/satellite-preview', '/submission-success'].includes(location.pathname)) return true;
     return false;
   };
 
-  const [notificationsList, setNotificationsList] = useState(() => {
-    const local = localStorage.getItem('carbonx_notifications');
-    if (local) return JSON.parse(local);
-    return [];
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
+  const goTo = (path) => { navigate(path); setSidebarOpen(false); };
+  const handleLogout = () => { logout(); navigate('/farmer-login'); };
+
+  const renderNavItems = () => navItems.map((item) => {
+    const active = isActive(item.path);
+    const Icon = item.icon;
+    return (
+      <button
+        key={item.path}
+        onClick={() => goTo(item.path)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+          active
+            ? 'bg-forest-100 text-forest-900 shadow-sm'
+            : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
+        }`}
+      >
+        <Icon size={18} className={active ? 'text-forest-700' : 'text-carbon-400'} />
+        <span>{item.name}</span>
+      </button>
+    );
   });
 
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [location.pathname]);
-
-  const goTo = (path) => {
-    navigate(path);
-    setSidebarOpen(false);
-  };
+  const renderUserBlock = () => (
+    <div className="pt-3 border-t border-forest-100">
+      <div className="flex items-center gap-2.5 px-2 py-2">
+        <div className="w-9 h-9 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
+          {displayLocation && <p className="text-[10px] text-carbon-400 truncate">{displayLocation}</p>}
+        </div>
+      </div>
+    </div>
+  );
 
   if (isPublicPage) {
     return <div className="min-h-screen bg-warm-white">{children}</div>;
@@ -98,7 +114,6 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-warm-white flex flex-col">
-      {/* Top Header */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-forest-100/60 flex justify-between items-center px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <button
@@ -114,14 +129,13 @@ export default function Layout({ children }) {
             CarbonX
           </span>
           {isAuthenticated && (
-            <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wide ${ROLE_COLORS[role] || ROLE_COLORS.farmer}`}>
-              {ROLE_LABELS[role] || 'User'}
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide ${roleMeta.classes}`}>
+              {roleMeta.label}
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Language selector */}
           <div className="flex items-center gap-1 bg-forest-50/80 border border-forest-100 rounded-xl px-2.5 py-1 text-xs text-forest-900 font-semibold">
             <Globe size={13} className="text-forest-700" />
             <select
@@ -135,20 +149,15 @@ export default function Layout({ children }) {
             </select>
           </div>
 
-          {/* Notifications */}
           {isAuthenticated && (
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="p-2 hover:bg-forest-50 rounded-xl text-carbon-700 transition-colors relative"
             >
               <Bell size={18} />
-              {notificationsList.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
-              )}
             </button>
           )}
 
-          {/* Profile avatar */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
@@ -173,7 +182,6 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Notifications dropdown */}
       {showNotifications && isAuthenticated && (
         <div className="fixed top-14 right-4 z-40 bg-white border border-forest-100 rounded-2xl shadow-xl p-4 w-80 max-h-96 overflow-y-auto">
           <div className="flex justify-between items-center mb-3">
@@ -182,65 +190,16 @@ export default function Layout({ children }) {
               <X size={14} />
             </button>
           </div>
-          {notificationsList.length === 0 ? (
-            <p className="text-xs text-carbon-400 text-center py-4">No notifications yet</p>
-          ) : (
-            notificationsList.map((n) => (
-              <div key={n.id} className="py-2.5 border-b border-forest-50 last:border-0 hover:bg-forest-50/60 text-xs transition-colors flex gap-2">
-                <span className="text-base mt-0.5">
-                  {n.type === 'success' ? '✅' : n.type === 'payment' ? '💰' : '🔔'}
-                </span>
-                <div>
-                  <p className="text-carbon-700 leading-snug">{n.text}</p>
-                  <span className="text-[9px] text-carbon-400 mt-1 block">{n.time}</span>
-                </div>
-              </div>
-            ))
-          )}
+          <p className="text-xs text-carbon-400 text-center py-4">No notifications yet</p>
         </div>
       )}
 
       <div className="flex flex-1">
-        {/* Desktop Sidebar */}
         <aside className="hidden md:flex flex-col w-56 bg-white border-r border-forest-100/60 p-4 sticky top-[57px] h-[calc(100vh-57px)]">
-          <nav className="flex-1 space-y-1">
-            {navItems.map((item, idx) => {
-              const active = getActiveTabClass(item.path);
-              const Icon = item.icon;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => goTo(item.path)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    active
-                      ? 'bg-forest-100 text-forest-900 shadow-sm'
-                      : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
-                  }`}
-                >
-                  <Icon size={18} className={active ? 'text-forest-700' : 'text-carbon-400'} />
-                  <span>{item.name}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* User info at bottom */}
-          {isAuthenticated && (
-            <div className="pt-3 border-t border-forest-100">
-              <div className="flex items-center gap-2.5 px-2 py-2">
-                <div className="w-9 h-9 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
-                  {initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
-                  {displayVillage && <p className="text-[10px] text-carbon-400 truncate">{displayVillage}</p>}
-                </div>
-              </div>
-            </div>
-          )}
+          <nav className="flex-1 space-y-1">{renderNavItems()}</nav>
+          {isAuthenticated && renderUserBlock()}
         </aside>
 
-        {/* Mobile Sidebar */}
         {sidebarOpen && (
           <>
             <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -251,29 +210,13 @@ export default function Layout({ children }) {
                   <X size={18} />
                 </button>
               </div>
-              <nav className="flex-1 space-y-1">
-                {navItems.map((item, idx) => {
-                  const active = getActiveTabClass(item.path);
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => goTo(item.path)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                        active
-                          ? 'bg-forest-100 text-forest-900 shadow-sm'
-                          : 'text-carbon-500 hover:bg-forest-50 hover:text-forest-800'
-                      }`}
-                    >
-                      <Icon size={18} className={active ? 'text-forest-700' : 'text-carbon-400'} />
-                      <span>{item.name}</span>
-                    </button>
-                  );
-                })}
-              </nav>
+              <nav className="flex-1 space-y-1">{renderNavItems()}</nav>
               {isAuthenticated && (
                 <div className="pt-3 border-t border-forest-100">
-                  <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+                  >
                     <LogOut size={16} />
                     <span>Logout</span>
                   </button>
@@ -283,20 +226,18 @@ export default function Layout({ children }) {
           </>
         )}
 
-        {/* Main content */}
         <main className="flex-1 overflow-x-hidden pb-20 md:pb-0">
           {children}
         </main>
       </div>
 
-      {/* Mobile Bottom Nav */}
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-forest-100/50 py-2.5 px-4 flex justify-around items-center md:hidden shadow-lg">
-        {navItems.slice(0, 5).map((item, idx) => {
-          const active = getActiveTabClass(item.path);
+        {navItems.slice(0, 5).map((item) => {
+          const active = isActive(item.path);
           const Icon = item.icon;
           return (
             <button
-              key={idx}
+              key={item.path}
               onClick={() => navigate(item.path)}
               className="flex flex-col items-center justify-center gap-1 transition-all duration-200 flex-1"
             >
