@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Compass, Building2, BadgeCheck, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Compass, Building2, BadgeCheck, ShieldCheck, Users } from 'lucide-react';
 
 export default function RoleSelection() {
   const navigate = useNavigate();
@@ -10,6 +10,7 @@ export default function RoleSelection() {
     { id: 'buyer', title: 'Corporate Buyer', desc: 'Browse verified carbon credit listings, analyze farm data, and purchase high-integrity credits from farmers.', icon: Building2, color: 'bg-sky-50 text-sky-700 border-sky-200', hover: 'hover:border-sky-400' },
     { id: 'verifier', title: 'Verifier / Govt', desc: 'Review KYC verifications, audit land documents, and ensure compliance across all carbon credit issuance.', icon: BadgeCheck, color: 'bg-amber-50 text-amber-700 border-amber-200', hover: 'hover:border-amber-400' },
     { id: 'admin', title: 'Admin', desc: 'Full platform oversight — manage users, monitor transactions, and configure system settings.', icon: ShieldCheck, color: 'bg-rose-50 text-rose-700 border-rose-200', hover: 'hover:border-rose-400' },
+    { id: 'fpo', title: 'FPO / Cooperative', desc: 'Onboard multiple farmers at scale, manage KYC verification, and track aggregate carbon credits across all member farms.', icon: Users, color: 'bg-violet-50 text-violet-700 border-violet-200', hover: 'hover:border-violet-400' },
   ];
 
   return (
