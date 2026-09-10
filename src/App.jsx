@@ -25,7 +25,6 @@ import CorporateCreditAnalysis from './pages/CorporateCreditAnalysis';
 import CorporateDashboard from './pages/CorporateDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import SupportCenter from './pages/SupportCenter';
-import FPODashboard from './pages/FPODashboard';
 
 function ProtectedRoute({ children, roles }) {
   const { isAuthenticated, role } = useAuth();
@@ -43,8 +42,6 @@ function DashboardRouter() {
       return <AdminDashboard />;
     case 'admin':
       return <AdminDashboard />;
-    case 'fpo':
-      return <FPODashboard />;
     default:
       return <FarmerDashboard />;
   }
@@ -70,7 +67,7 @@ export default function App() {
               <Route path="/satellite-preview" element={<ProtectedRoute><SatellitePreview /></ProtectedRoute>} />
               <Route path="/submission-success" element={<ProtectedRoute><SuccessScreen /></ProtectedRoute>} />
               <Route path="/farm-verification" element={<ProtectedRoute><FarmOwnershipVerification /></ProtectedRoute>} />
-              <Route path="/verification-success" element={<ProtectedRoute><VerificationSuccess /></ProtectedRoute>} />
+               <Route path="/verification-success" element={<ProtectedRoute><VerificationSuccess /></ProtectedRoute>} />
 
               {/* Shared authenticated routes */}
               <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
@@ -78,9 +75,6 @@ export default function App() {
               <Route path="/wallet" element={<ProtectedRoute><CarbonWallet /></ProtectedRoute>} />
               <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
               <Route path="/support" element={<ProtectedRoute><SupportCenter /></ProtectedRoute>} />
-
-              {/* FPO routes */}
-              <Route path="/fpo-onboard" element={<ProtectedRoute roles={['fpo']}><FPODashboard /></ProtectedRoute>} />
 
               {/* Buyer routes */}
               <Route path="/corporate-welcome" element={<ProtectedRoute roles={['buyer']}><CorporateWelcome /></ProtectedRoute>} />
