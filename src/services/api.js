@@ -133,41 +133,6 @@ export async function getBlockchainHealth() {
   }
 }
 
-// ── FPO ──
-
-export async function getFpoFarmers() {
-  try {
-    const res = await fetch(`${PY}/fpo/farmers`, { headers: authHeaders() });
-    if (!res.ok) throw new Error('API unavailable');
-    return await res.json();
-  } catch {
-    const { getDemoFarmers } = await import('../data/demoData');
-    return { success: true, farmers: getDemoFarmers(), source: 'demo' };
-  }
-}
-
-export async function fpoOnboardFarmer(payload) {
-  try {
-    return await post(`${PY}/fpo/onboard`, payload);
-  } catch {
-    const { addDemoFarmer } = await import('../data/demoData');
-    const farmers = addDemoFarmer(payload);
-    return { success: true, farmers, source: 'demo' };
-  }
-}
-
-export async function getFpoStats() {
-  try {
-    const res = await fetch(`${PY}/fpo/stats`, { headers: authHeaders() });
-    if (!res.ok) throw new Error('API unavailable');
-    return await res.json();
-  } catch {
-    const { getDemoFarmers, getFpoStats: calcStats } = await import('../data/demoData');
-    const farmers = getDemoFarmers();
-    return { success: true, stats: calcStats(farmers), source: 'demo' };
-  }
-}
-
 /** Combined carbon + biodiversity credits from farm or analysis row */
 export function combinedCredits(row) {
   const carbon = parseFloat(row?.carbon_tonnes ?? row?.carbon_credits ?? 0) || 0;
