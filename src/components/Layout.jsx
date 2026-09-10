@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Compass, ShoppingCart, Wallet, Menu, Bell, Globe, X, LogOut,
   ShieldCheck, ClipboardList, BarChart3, Sprout, Building2, ChevronLeft,
+  Users,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +34,14 @@ const ROLE_NAV = {
     { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
+  fpo: [
+    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'Onboard Farmer', path: '/fpo-onboard', icon: Users },
+    { name: 'KYC Verification', path: '/farm-verification', icon: ShieldCheck },
+    { name: 'Farm Analytics', path: '/farm-analytics', icon: Compass },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
+    { name: 'Carbon Wallet', path: '/wallet', icon: Wallet },
+  ],
 };
 
 const ROLE_META = {
@@ -40,6 +49,7 @@ const ROLE_META = {
   buyer:   { label: 'Corporate Buyer',  classes: 'bg-sky-50 text-sky-700' },
   verifier:{ label: 'Verifier',         classes: 'bg-amber-50 text-amber-700' },
   admin:   { label: 'Admin',            classes: 'bg-rose-50 text-rose-700' },
+  fpo:     { label: 'FPO',              classes: 'bg-violet-50 text-violet-700' },
 };
 
 export default function Layout({ children }) {
