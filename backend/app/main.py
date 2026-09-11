@@ -205,8 +205,6 @@ class LandVerificationModel(BaseModel):
     confirm_polygon: Optional[bool] = False
     pahani_file: Optional[str] = ""
     document_content_type: Optional[str] = "image/jpeg"
-
-
 class AadhaarVerificationModel(BaseModel):
     front_image: str
     back_image: str
