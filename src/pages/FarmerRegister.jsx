@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { sendOtp, registerUser } from '../services/api';
+import { sendOtp, verifyRegistrationOtp, registerUser } from '../services/api';
 
 const isValidAadhaar = (value) => {
   const number = value.replace(/\D/g, '');
@@ -32,12 +32,13 @@ export default function FarmerRegister() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedRole = searchParams.get('role') || 'farmer';
-  const { t, changeLanguage, currentLang } = useLanguage();
+  const { changeLanguage, currentLang } = useLanguage();
   const { login } = useAuth();
 
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpVerificationToken, setOtpVerificationToken] = useState('');
   const [devOtp, setDevOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [name, setName] = useState('');
@@ -60,6 +61,8 @@ export default function FarmerRegister() {
     try {
       const res = await sendOtp(cleanPhone);
       if (res.success) {
+        setOtp('');
+        setOtpVerificationToken('');
         setDevOtp(res.dev_otp || '');
         setOtpSent(true);
       } else {
@@ -73,8 +76,26 @@ export default function FarmerRegister() {
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    if (otp.length < 4) return setError('Enter the complete OTP');
-    setStep(2);
+    setError('');
+    if (otp.length !== 6) return setError('Enter the complete 6-digit OTP');
+    setLoading(true);
+    try {
+      const res = await verifyRegistrationOtp(phone.replace(/\D/g, ''), otp);
+      if (!res.success) {
+        setError(res.message || 'Invalid or expired OTP');
+        return;
+      }
+      if (!res.verification_token) {
+        setError('OTP verification did not complete. Please request a new OTP.');
+        return;
+      }
+      setOtpVerificationToken(res.verification_token);
+      setStep(2);
+    } catch {
+      setError('Could not verify OTP. Ensure backend is running.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAadhaar = (e) => {
@@ -94,6 +115,7 @@ export default function FarmerRegister() {
       const res = await registerUser({
         phone: phone.replace(/\D/g, ''),
         otp,
+        otp_verification_token: otpVerificationToken,
         name,
         aadhaar,
         state,

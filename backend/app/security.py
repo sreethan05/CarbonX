@@ -16,9 +16,9 @@ def hash_password(password: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(str(plain_password)[:50], hashed_password)
 
-def create_access_token(data: dict):
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    to_encode["exp"] = datetime.now(timezone.utc) + timedelta(hours=72)
+    to_encode["exp"] = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=72))
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str):

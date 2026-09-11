@@ -30,10 +30,10 @@ export default function FarmOwnershipVerification() {
     setTimeout(() => {
       setUploading(false);
       setOcrData({
-        farmerName: user?.name || 'Ramesh Kumar',
-        surveyNo: '184/A/2',
-        village: user?.village || 'Venkateshwara Pally',
-        area: '4.28 Ha',
+        farmerName: user?.name || '',
+        surveyNo: '',
+        village: user?.village || '',
+        area: '',
       });
       setStep('ocr');
     }, 2000);
@@ -74,11 +74,11 @@ export default function FarmOwnershipVerification() {
       const res = await verifyLandDocument({
         document_name: file?.name || 'land_record.png',
         document_content_base64: base64Content,
-        extracted_text: `Patta passbook survey ${ocrData.surveyNo || '184/A/2'} ${ocrData.farmerName || user?.name || ''} village ${ocrData.village || user?.village || ''}`,
-        survey_number: ocrData.surveyNo || '184/A/2',
+        extracted_text: `Patta passbook survey ${ocrData.surveyNo || ''} ${ocrData.farmerName || user?.name || ''} village ${ocrData.village || user?.village || ''}`,
+        survey_number: ocrData.surveyNo || '',
         village: ocrData.village || user?.village || '',
         district: user?.district || '',
-        area_acres: parseFloat(ocrData.area) || 3.5,
+        area_acres: parseFloat(ocrData.area) || undefined,
       });
 
       if (res && res.success) {
@@ -91,15 +91,11 @@ export default function FarmOwnershipVerification() {
         });
       }
     } catch (err) {
+      setError(err?.message || 'Verification request failed. Please retry or send to FPO.');
       setResult({
-        status: 'VERIFIED',
-        reasons: [],
-        checks: {
-          identity_match: 'Aadhaar name matched with land record',
-          ocr_extraction: 'Keywords & survey number identified',
-          land_ownership: 'Survey record confirmed',
-          gps_consistency: 'Village satellite coordinates verified',
-        },
+        status: 'FLAGGED',
+        reasons: [err?.message || 'Verification request failed. Please retry or send to FPO.'],
+        checks: {},
       });
     }
     setStep('result');

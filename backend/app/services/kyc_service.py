@@ -29,8 +29,14 @@ LAND_DOCUMENT_KEYWORDS = (
 
 
 def _configure_tesseract():
-    """Detect and configure Tesseract executable on Windows or system PATH."""
+    """Detect and configure Tesseract executable on Windows or system PATH.
+
+    Returns None (silent) when the binary is missing so callers fall back
+    to user-supplied `extracted_text` / Azure Document Intelligence.
+    """
     try:
+        import shutil
+
         import pytesseract
         windows_paths = [
             r"C:\Program Files\Tesseract-OCR\tesseract.exe",
@@ -41,7 +47,10 @@ def _configure_tesseract():
             if os.path.exists(path):
                 pytesseract.pytesseract.tesseract_cmd = path
                 return pytesseract
-        return pytesseract
+        # No hard-coded Windows path found — trust PATH, else give up silently.
+        if shutil.which("tesseract") or shutil.which(pytesseract.pytesseract.tesseract_cmd):
+            return pytesseract
+        return None
     except ImportError:
         return None
 
@@ -77,15 +86,18 @@ def _average_hash(image: Image.Image) -> str:
 
 
 def _extract_ocr_text(image: Image.Image) -> tuple[str, bool]:
-    """Run Tesseract OCR on a PIL image."""
+    """Run Tesseract OCR on a PIL image.
+
+    Silent fallback: returns ("", False) when the binary is missing so the
+    pipeline can use `extracted_text` / Azure instead. No noisy traceback.
+    """
     pytess = _configure_tesseract()
     if not pytess:
         return "", False
     try:
         text = pytess.image_to_string(image)
         return text.strip(), True
-    except Exception as exc:
-        print(f"Tesseract OCR failed: {exc}")
+    except Exception:
         return "", False
 
 
