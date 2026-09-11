@@ -641,10 +641,10 @@ def verify_aadhaar(data: AadhaarVerificationModel, current_user: dict = Depends(
             "dob": dob_match.group(1) if dob_match else None,
             "reasons": reasons,
         }
-    except ValueError as exc:
-        return {"success": False, "message": str(exc)}
-    except Exception as exc:
-        return {"success": False, "message": f"Could not read Aadhaar images: {exc}"}
+    except ValueError:
+        return {"success": False, "message": "Invalid Aadhaar upload. Please use a valid JPG, PNG, or PDF file."}
+    except Exception:
+        return {"success": False, "message": "Could not process Aadhaar images. Please try again."}
 
 
 @app.post("/verify-land")
