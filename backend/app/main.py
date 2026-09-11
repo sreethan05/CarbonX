@@ -12,7 +12,7 @@ load_dotenv(BACKEND_DIR / ".env", override=True)
 from fastapi import FastAPI, File, Header, HTTPException, Depends, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 import base64
 import re
 from datetime import datetime, timedelta, timezone
@@ -141,7 +141,7 @@ class RegisterModel(BaseModel):
     village: str
     upi: str = ""
     email: Optional[str] = ""
-    role: Optional[str] = "farmer"
+    role: Optional[Literal["farmer", "buyer", "fpo", "verifier", "admin"]] = "farmer"
     preferred_language: Optional[str] = "en"
     otp_verification_token: Optional[str] = ""
 
@@ -173,7 +173,7 @@ class UpdateProfileModel(BaseModel):
     district: Optional[str] = None
     village: Optional[str] = None
     upi: Optional[str] = None
-    role: Optional[str] = None
+    role: Optional[Literal["farmer", "buyer", "fpo", "verifier", "admin"]] = None
     preferred_language: Optional[str] = None
 
 
@@ -244,6 +244,7 @@ def _user_response(user: dict, phone: str):
         "upi": user.get("upi", ""),
         "email": user.get("email", ""),
         "aadhaar_last4": user.get("aadhaar_last4") or user.get("aadhaar", ""),
+        "fpo_id": user.get("fpo_id"),
         "preferred_language": user.get("preferred_language", "en"),
     }
 
