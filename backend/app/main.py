@@ -13,6 +13,8 @@ from fastapi import FastAPI, File, Header, HTTPException, Depends, Query, Upload
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import base64
+import re
 from datetime import datetime, timedelta, timezone
 import os
 
@@ -129,7 +131,8 @@ class RegisterModel(BaseModel):
     state: str
     district: str
     village: str
-    upi: str
+    upi: str = ""
+    email: Optional[str] = ""
     role: Optional[str] = "farmer"
     preferred_language: Optional[str] = "en"
     otp_verification_token: Optional[str] = ""
@@ -192,6 +195,15 @@ class LandVerificationModel(BaseModel):
     geojson: Optional[dict] = None
     aadhaar: Optional[str] = None
     confirm_polygon: Optional[bool] = False
+    pahani_file: Optional[str] = ""
+    document_content_type: Optional[str] = "image/jpeg"
+
+
+class AadhaarVerificationModel(BaseModel):
+    front_image: str
+    back_image: str
+    front_content_type: Optional[str] = "image/jpeg"
+    back_content_type: Optional[str] = "image/jpeg"
 
 
 class AutoDrawModel(BaseModel):
@@ -240,6 +252,7 @@ def _user_response(user: dict, phone: str):
         "district": user.get("district", ""),
         "village": user.get("village", ""),
         "upi": user.get("upi", ""),
+        "email": user.get("email", ""),
         "aadhaar_last4": user.get("aadhaar_last4") or user.get("aadhaar", ""),
         "preferred_language": user.get("preferred_language", "en"),
     }
@@ -253,6 +266,72 @@ def _send_otp_flow(phone: str):
     if not sms_sent:
         response["dev_otp"] = otp
     return response
+
+
+def _decode_upload(content: str) -> bytes:
+    """Decode a browser data-URL/base64 upload without writing identity files to disk."""
+    encoded = (content or "").split(",")[-1]
+    if not encoded:
+        raise ValueError("Upload a document first.")
+    try:
+        return base64.b64decode(encoded, validate=False)
+    except Exception as exc:
+        raise ValueError("Document content must be valid base64.") from exc
+
+
+def _pahani_polygon(coords: Optional[list]) -> Optional[dict]:
+    """Turn Section 5 latitude/longitude points into a GeoJSON feature."""
+    ring = []
+    for point in coords or []:
+        try:
+            ring.append([float(point["longitude"]), float(point["latitude"])])
+        except (KeyError, TypeError, ValueError):
+            continue
+    if len(ring) < 3:
+        return None
+    if ring[0] != ring[-1]:
+        ring.append(ring[0])
+    return {"type": "Feature", "properties": {"source": "pahani_section_5"}, "geometry": {"type": "Polygon", "coordinates": [ring]}}
+
+
+def _pahani_fallback_fields(text: str) -> dict:
+    """Small OCR fallback when Azure layout extraction is unavailable."""
+    def found(pattern: str) -> Optional[str]:
+        match = re.search(pattern, text, re.IGNORECASE)
+        return match.group(1).strip() if match else None
+
+    aadhaar = re.search(r"(?:\d{4}[- ]?){2}\d{4}", text)
+    return {
+        "survey_no": found(r"survey\s*(?:no\.?|number)?\s*[:#-]?\s*([A-Z0-9/-]+)"),
+        "pattadar_name": found(r"(?:pattadar|owner)\s*(?:name)?\s*[:#-]?\s*([^\n]{3,80})"),
+        "aadhaar": aadhaar.group(0) if aadhaar else None,
+        "village": found(r"village\s*[:#-]?\s*([^\n]{2,80})"),
+        "district": found(r"district\s*[:#-]?\s*([^\n]{2,80})"),
+        "crop_name": found(r"crop\s*(?:name)?\s*[:#-]?\s*([^\n]{2,60})"),
+        "irrigation_source": found(r"irrigation\s*(?:source)?\s*[:#-]?\s*([^\n]{2,60})"),
+        "extent_acres": None,
+        "extent_hectares": None,
+        "mandal": None,
+        "boundary_coords": None,
+    }
+
+
+def _parse_pahani_upload(content_base64: str, filename: str, content_type: str) -> tuple[dict, str]:
+    """Use the existing Azure + Pahani parser, with installed Tesseract as fallback."""
+    from app.services.document_intelligence_service import analyze_document_bytes, validate_upload
+    from app.services.pahani_parser import parse_pahani
+
+    raw = _decode_upload(content_base64)
+    validate_upload(content_type, raw)
+    try:
+        parsed = parse_pahani(analyze_document_bytes(raw, filename=filename))
+        return parsed["fields"], parsed.get("english_text", "")
+    except RuntimeError as exc:
+        # Azure is optional in the local SIH demo. Tesseract remains a real OCR fallback.
+        print(f"Pahani Azure OCR unavailable, using local OCR fallback: {exc}")
+        checks = analyse_document(content_base64, filename, "", "", [])
+        text = checks.get("ocr_text_preview", "")
+        return _pahani_fallback_fields(text), text
 
 
 @app.get("/")
@@ -338,7 +417,7 @@ def register(data: RegisterModel):
         lang = (data.preferred_language or "en")[:2]
         role = data.role or "farmer"
         if existing:
-            db.update_profile(phone, {
+            profile_fields = {
                 "name": data.name or existing.get("name"),
                 "state": data.state,
                 "district": data.district,
@@ -347,7 +426,11 @@ def register(data: RegisterModel):
                 "aadhaar_last4": data.aadhaar[-4:],
                 "preferred_language": lang,
                 "role": role,
-            })
+            }
+            # `email` is optional until migration 05 has been applied.
+            if data.email:
+                profile_fields["email"] = data.email.strip().lower()
+            db.update_profile(phone, profile_fields)
             user = _get_user(phone)
             token = create_access_token({"phone": phone, "name": user.get("name", ""), "role": user.get("role", "farmer")})
             return {
@@ -367,6 +450,8 @@ def register(data: RegisterModel):
             "preferred_language": lang,
             "role": role,
         }
+        if data.email:
+            user["email"] = data.email.strip().lower()
         _save_user(user)
         token = create_access_token({"phone": phone, "name": data.name, "role": role})
         return {
@@ -514,6 +599,59 @@ def check_farmland(data: CheckFarmlandModel, current_user: dict = Depends(get_cu
     }
 
 
+@app.post("/verify-aadhaar")
+def verify_aadhaar(data: AadhaarVerificationModel, current_user: dict = Depends(get_current_user)):
+    """OCR Aadhaar front/back and compare it to the registered identity anchor.
+
+    CarbonX deliberately stores only the Aadhaar last four digits, so the card
+    comparison uses the extracted last four digits rather than retaining a full
+    Aadhaar number in Supabase.
+    """
+    from PIL import Image
+    import io
+    from app.services.kyc_service import _extract_ocr_text, _match_name
+
+    profile = _get_user(current_user.get("phone"))
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        parts = []
+        for image_content, content_type in ((data.front_image, data.front_content_type), (data.back_image, data.back_content_type)):
+            raw = _decode_upload(image_content)
+            if content_type == "application/pdf":
+                from app.services.document_intelligence_service import analyze_document_bytes
+                parts.append(analyze_document_bytes(raw).get("content", ""))
+            else:
+                with Image.open(io.BytesIO(raw)) as image:
+                    text, available = _extract_ocr_text(image)
+                    if available:
+                        parts.append(text)
+        ocr_text = "\n".join(parts)
+        card_numbers = re.findall(r"(?:\d{4}[- ]?){2}\d{4}", ocr_text)
+        card_last4 = card_numbers[0].replace(" ", "").replace("-", "")[-4:] if card_numbers else ""
+        registered_last4 = str(profile.get("aadhaar_last4") or "")[-4:]
+        _score, matched_name = _match_name(profile.get("name", ""), ocr_text)
+        matched_aadhaar = bool(card_last4 and registered_last4 and card_last4 == registered_last4)
+        dob_match = re.search(r"(?:DOB|Date of Birth)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})", ocr_text, re.IGNORECASE)
+        reasons = []
+        if not matched_name:
+            reasons.append("Name on Aadhaar card does not match your registered name")
+        if not matched_aadhaar:
+            reasons.append("Aadhaar number on card does not match your registered number")
+        return {
+            "success": True,
+            "verified": matched_name and matched_aadhaar,
+            "matched_name": matched_name,
+            "matched_aadhaar": matched_aadhaar,
+            "dob": dob_match.group(1) if dob_match else None,
+            "reasons": reasons,
+        }
+    except ValueError as exc:
+        return {"success": False, "message": str(exc)}
+    except Exception as exc:
+        return {"success": False, "message": f"Could not read Aadhaar images: {exc}"}
+
+
 @app.post("/verify-land")
 def verify_land_document(data: LandVerificationModel, current_user: dict = Depends(get_current_user)):
     """Run the trust engine. Backend assigns tier, badge, status, and eligibility."""
@@ -521,6 +659,7 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
         from app.services.fraud_engine import run_fraud_checks
         from app.services.registry_service import lookup_survey
         from app.services.trust_engine import apply_fraud, decide_tier
+        from app.services.kyc_service import _match_name
 
         _require_database()
         phone = current_user.get("phone")
@@ -534,6 +673,8 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
         claimed_ha = _claimed_area_ha(data)
 
         if fpo_path:
+            if profile.get("role", "farmer") == "farmer":
+                return {"success": False, "message": "Pahani upload is required for farmer verification. If you need help obtaining one, please contact your FPO."}
             if data.fpo_id:
                 db.update_profile(phone, {"fpo_id": data.fpo_id})
             trust = apply_fraud(decide_tier(fpo_path=True), {"status": "PENDING", "risk": "LOW", "failed_checks": []})
@@ -556,27 +697,60 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             _patch_farm(data.farm_id, {"status": "PENDING"})
             return {"success": True, **trust, "verification": saved, "checks": record["checks"], "reasons": record["reasons"]}
 
+        document_content = data.pahani_file or data.document_content_base64
+        if not document_content:
+            return {"success": False, "message": "Upload your Pahani land record before verification. Please contact your FPO if you need assistance."}
+
+        pahani_fields, pahani_text = _parse_pahani_upload(
+            document_content,
+            data.document_name or "pahani.jpg",
+            data.document_content_type or "image/jpeg",
+        )
+        survey_number = pahani_fields.get("survey_no") or data.survey_number or ""
+        village = pahani_fields.get("village") or village
+        district = pahani_fields.get("district") or district
+        parsed_area_ha = pahani_fields.get("extent_hectares")
+        if not parsed_area_ha and pahani_fields.get("extent_acres"):
+            parsed_area_ha = round(float(pahani_fields["extent_acres"]) * 0.404686, 4)
+        claimed_ha = parsed_area_ha or claimed_ha
+        pahani_polygon = _pahani_polygon(pahani_fields.get("boundary_coords"))
+
         checks = analyse_document(
-            data.document_content_base64,
+            document_content,
             data.document_name,
             profile.get("name", ""),
-            data.extracted_text or "",
+            f"{pahani_text} {data.extracted_text or ''}",
             db.get_document_hashes(),
             village=village,
             district=district,
             state=state,
         )
-        registry = lookup_survey(data.survey_number) if data.survey_number else {"found": False}
+        registry = lookup_survey(survey_number) if survey_number else {"found": False}
         if registry.get("error") == "permission_denied":
-            registry = {"found": False, "survey_number": data.survey_number, "message": registry.get("message")}
+            registry = {"found": False, "survey_number": survey_number, "message": registry.get("message")}
 
-        ocr_text = f"{checks.get('ocr_text_preview') or ''} {data.extracted_text or ''}"
+        ocr_text = f"{checks.get('ocr_text_preview') or ''} {pahani_text} {data.extracted_text or ''}"
+        document_owner = pahani_fields.get("pattadar_name") or ""
+        document_aadhaar = str(pahani_fields.get("aadhaar") or "").replace(" ", "").replace("-", "")
+        registered_last4 = str(profile.get("aadhaar_last4") or "")[-4:]
+        _name_score, name_ok = _match_name(profile.get("name", ""), document_owner or ocr_text)
+        aadhaar_ok = bool(document_aadhaar and registered_last4 and document_aadhaar[-4:] == registered_last4)
+        village_ok = bool(pahani_fields.get("village") and profile.get("village") and pahani_fields["village"].strip().lower() == profile["village"].strip().lower())
+        district_ok = bool(pahani_fields.get("district") and profile.get("district") and pahani_fields["district"].strip().lower() == profile["district"].strip().lower())
+        three_way_failures = []
+        if not name_ok:
+            three_way_failures.append("pahani_owner_name_mismatch")
+        if not aadhaar_ok:
+            three_way_failures.append("pahani_aadhaar_mismatch")
+        if not village_ok or not district_ok:
+            three_way_failures.append("pahani_location_mismatch")
+        geojson = pahani_polygon or data.geojson or registry.get("geojson")
         decision = decide_tier(
             fpo_path=False,
-            survey_number=data.survey_number or "",
+            survey_number=survey_number,
             registry=registry,
             owner_name=profile.get("name", ""),
-            ocr_owner=ocr_text,
+            ocr_owner=document_owner or ocr_text,
             claimed_area_ha=claimed_ha or registry.get("area_ha"),
         )
         fraud = run_fraud_checks(
@@ -585,10 +759,15 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             owner_name=profile.get("name", ""),
             ocr_text=ocr_text,
             village=village,
-            geojson=data.geojson,
-            other_farm_geojsons=db.farm_geojsons_except(phone) if data.geojson else [],
+            geojson=geojson,
+            other_farm_geojsons=db.farm_geojsons_except(phone) if geojson else [],
             claimed_area_ha=claimed_ha or registry.get("area_ha"),
+            skip_ndvi=True,
         )
+        if three_way_failures:
+            fraud["failed_checks"] = list(dict.fromkeys([*fraud.get("failed_checks", []), *three_way_failures]))
+            fraud["status"] = "FLAGGED"
+            fraud["risk"] = "HIGH"
         trust = apply_fraud(decision, fraud)
         reasons = list(trust["failed_checks"])
         record = {
@@ -597,11 +776,17 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             "reasons": reasons,
             "checks": {**checks, "registry": registry, "fraud": fraud, "trust": trust},
             "extracted_fields": {
-                "survey_number": data.survey_number,
+                "survey_number": survey_number,
                 "village": village,
                 "district": district,
-                "area_acres": data.area_acres,
+                "area_acres": pahani_fields.get("extent_acres") or data.area_acres,
                 "area_hectares": claimed_ha,
+                "owner_name": document_owner,
+                "crop": pahani_fields.get("crop_name"),
+                "irrigation": pahani_fields.get("irrigation_source"),
+                "mandal": pahani_fields.get("mandal"),
+                "pahani_fields": pahani_fields,
+                "polygon_geojson": geojson,
                 "ocr_text_preview": checks.get("ocr_text_preview", ""),
                 "geocoded_location": checks.get("geocoded_location"),
                 "satellite_ndvi": checks.get("satellite_ndvi") or {},
@@ -626,6 +811,18 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             "registry": registry,
             "fraud": fraud,
             "verification": saved,
+            "polygon_geojson": geojson,
+            "extracted": {
+                "survey_no": survey_number,
+                "owner_name": document_owner,
+                "area_acres": pahani_fields.get("extent_acres") or data.area_acres,
+                "area_hectares": claimed_ha,
+                "crop": pahani_fields.get("crop_name"),
+                "irrigation": pahani_fields.get("irrigation_source"),
+                "village": village,
+                "mandal": pahani_fields.get("mandal"),
+                "district": district,
+            },
         }
     except HTTPException:
         raise

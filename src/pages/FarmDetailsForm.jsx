@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -7,12 +7,16 @@ import { updateProfile } from '../services/api';
 
 export default function FarmDetailsForm() {
   const navigate = useNavigate();
-  const { t, currentLang } = useLanguage();
-  const { user, token, setUserProfile, farms } = useAuth();
+  const location = useLocation();
+  const { currentLang } = useLanguage();
+  const { token, setUserProfile, farms } = useAuth();
   const latestFarm = farms[0];
 
-  const [crop, setCrop] = useState(latestFarm?.crop_type || 'Mixed Crop');
-  const [irrigation, setIrrigation] = useState(latestFarm?.irrigation || 'Drip Irrigation');
+  const pahaniCrop = location.state?.cropType || '';
+  const pahaniIrrigation = location.state?.irrigation || '';
+  const hasPahaniPrefill = Boolean(pahaniCrop || pahaniIrrigation);
+  const [crop, setCrop] = useState(pahaniCrop || latestFarm?.crop_type || 'Mixed Crop');
+  const [irrigation, setIrrigation] = useState(pahaniIrrigation || latestFarm?.irrigation || 'Drip Irrigation');
   const [soil, setSoil] = useState('Red Sandy Loam');
   const [organic, setOrganic] = useState('Yes - Zero Chemical');
   const [treeCount, setTreeCount] = useState(1240);
@@ -36,8 +40,8 @@ export default function FarmDetailsForm() {
     setLoading(false);
   };
 
-  const crops = ['Paddy (Rice)', 'Cotton', 'Maize', 'Groundnut', 'Teak', 'Mango', 'Mixed Crop'];
-  const irrigations = ['Drip Irrigation', 'Flood Irrigation', 'Sprinkler', 'Rainfed'];
+  const crops = [...new Set([crop, 'Paddy (Rice)', 'Cotton', 'Maize', 'Groundnut', 'Teak', 'Mango', 'Mixed Crop'])];
+  const irrigations = [...new Set([irrigation, 'Drip Irrigation', 'Flood Irrigation', 'Sprinkler', 'Rainfed'])];
   const soils = ['Red Sandy Loam', 'Black Cotton Soil', 'Alluvial', 'Laterite'];
   const organics = ['Yes - Zero Chemical', 'Partial Organic', 'Conventional'];
 
@@ -66,6 +70,11 @@ export default function FarmDetailsForm() {
       {error && <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 mb-4 text-xs text-rose-700">{error}</div>}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-forest-100 shadow-sm p-6 space-y-5">
+        {hasPahaniPrefill && (
+          <div className="bg-forest-50 border border-forest-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-forest-800">
+            Auto-filled from your Pahani — edit if needed.
+          </div>
+        )}
         <Select label="Crop Type" value={crop} onChange={setCrop} options={crops} />
         <Select label="Irrigation Method" value={irrigation} onChange={setIrrigation} options={irrigations} />
         <Select label="Soil Type" value={soil} onChange={setSoil} options={soils} />
