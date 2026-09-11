@@ -9,14 +9,14 @@ ROOT_DIR = BACKEND_DIR.parent
 load_dotenv(ROOT_DIR / ".env", override=True)
 load_dotenv(BACKEND_DIR / ".env", override=True)
 
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import os
 
-from app.security import create_access_token, decode_token
+from app.security import create_access_token, get_current_user, require_role
 from app.phone_service import generate_otp, send_phone_otp
 from app import supabase_db as db
 from app.services.kyc_service import analyse_document, validate_aadhaar
@@ -183,24 +183,8 @@ class LandVerificationModel(BaseModel):
     area_acres: Optional[float] = None
 
 
-def get_current_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    token = authorization.split(" ")[1]
-    payload = decode_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return payload
-
-
-def require_role(*allowed_roles):
-    """Dependency factory: only allow users with one of the specified roles."""
-    def _check(current_user: dict = Depends(get_current_user)):
-        role = current_user.get("role", "farmer")
-        if role not in allowed_roles:
-            raise HTTPException(status_code=403, detail=f"Access denied. Required role: {', '.join(allowed_roles)}")
-        return current_user
-    return _check
+from app.voice_agent.voice_routes import router as voice_router
+app.include_router(voice_router)
 
 
 def _user_response(user: dict, phone: str):

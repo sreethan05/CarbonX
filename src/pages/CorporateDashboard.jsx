@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getMarketplaceListings, combinedCredits } from '../services/api';
 
 const DEFAULTS = {
-  companyName: 'Corporate Buyer', esgTarget: 1000, purchasedCredits: 0,
+  name: 'Corporate Buyer', esgTarget: 1000, purchasedCredits: 0,
   complianceScore: 0, activeBids: 0, portfolio: [], offsetsTimeline: [],
 };
 
@@ -28,7 +28,7 @@ export default function CorporateDashboard() {
         return { id: l.id, farm: l.crop || 'Carbon Credits', state: l.location || '', size: `${c.total} tCO2e`,
           status: l.status || 'Active', purchased: c.total, price: `₹${l.price_per_credit || 520}/cr` };
       });
-      setCorp({ ...DEFAULTS, companyName: user?.name || 'Corporate Buyer', purchasedCredits: Math.round(purchased),
+      setCorp({ ...DEFAULTS, name: user?.name || 'Corporate Buyer', purchasedCredits: Math.round(purchased),
         complianceScore: listings.length ? 92 : 0, activeBids: listings.filter(l => l.status === 'Active').length,
         portfolio, offsetsTimeline: portfolio.slice(0, 6).map((p, i) => ({ year: `Q${(i % 4) + 1}`, offset: p.purchased, target: Math.max(p.purchased * 0.8, 1) })) });
     }).catch(() => {});
@@ -46,7 +46,7 @@ export default function CorporateDashboard() {
           <div className="w-11 h-11 bg-forest-700 text-white rounded-xl flex items-center justify-center font-bold">B</div>
           <div>
             <p className="text-xs text-carbon-500">Corporate Buyer Account</p>
-            <h2 className="text-sm font-black text-carbon-900">{corp.companyName}</h2>
+            <h2 className="text-sm font-black text-carbon-900">{corp.name}</h2>
           </div>
         </div>
         <span className="text-[10px] bg-forest-50 text-forest-700 border border-forest-100 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">ESG</span>

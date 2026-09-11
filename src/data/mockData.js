@@ -18,7 +18,6 @@ export const mockFarms = [];
 
 export const mockCorporate = {
   name: 'Corporate Buyer',
-  companyName: 'Corporate Buyer',
   purchasedCredits: 0,
   esgTarget: 10000,
   complianceScore: 0,
