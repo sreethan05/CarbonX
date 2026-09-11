@@ -45,11 +45,19 @@ except Exception as e:
     print(f"Earth Engine not available: {e}")
 
 
+def _sms_ready() -> bool:
+    """True when Textplate SMS creds are set (token + template id)."""
+    try:
+        from app.phone_service import sms_configured
+
+        return sms_configured()
+    except Exception:
+        return False
+
+
 def _twilio_ready() -> bool:
-    return all(
-        os.getenv(k, "").strip()
-        for k in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER")
-    )
+    """Kept for backwards compat (/health consumers). Now mirrors SMS status."""
+    return _sms_ready()
 
 
 def _require_database():
@@ -246,10 +254,13 @@ def _send_otp_flow(phone: str):
     otp = generate_otp()
     _store_otp(phone, otp)
     sms_sent = send_phone_otp(phone, otp)
-    response = {"success": True, "message": "OTP sent to your phone via SMS" if sms_sent else "OTP generated (dev mode)"}
-    if not sms_sent:
-        response["dev_otp"] = otp
-    return response
+    if sms_sent:
+        return {"success": True, "message": "OTP sent to your phone via SMS"}
+    # SMS provider configured but send failed -> do NOT leak OTP.
+    if _sms_ready():
+        return {"success": False, "message": "Failed to send OTP SMS. Please retry."}
+    # Dev mode (no Textplate creds): expose OTP for local testing only.
+    return {"success": True, "message": "OTP generated (dev mode)", "dev_otp": otp}
 
 
 def _decode_upload(content: str) -> bytes:
@@ -324,6 +335,7 @@ def root():
         "message": "CarbonX API running",
         "version": "5.0",
         "supabase": db.is_ready(),
+        "sms": _sms_ready(),
         "twilio": _twilio_ready(),
         "earth_engine": earth_engine_ready,
     }
@@ -335,7 +347,8 @@ def health():
     return {
         "success": database["ready"],
         "database": database,
-        "twilio": {"ready": _twilio_ready(), "provider": "Twilio"},
+        "sms": {"ready": _sms_ready(), "provider": "Textplate"},
+        "twilio": {"ready": _twilio_ready(), "provider": "Textplate"},
         "earth_engine": {"ready": earth_engine_ready},
     }
 
