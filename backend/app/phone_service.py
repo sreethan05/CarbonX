@@ -22,7 +22,7 @@ def send_phone_otp(phone: str, otp: str) -> bool:
 
             client = Client(account_sid, auth_token)
             message = client.messages.create(
-                body=f"Your CarbonX OTP is: {otp}. Valid for 10 minutes. Do not share this code.",
+                body=f"Your CarbonX OTP is: {otp}. Valid for 3 minutes. Do not share this code.",
                 from_=from_number,
                 to=f"+91{phone}",
             )

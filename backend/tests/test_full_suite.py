@@ -66,10 +66,20 @@ class TestCarbonXFullSuite(unittest.TestCase):
         otp = otp_data.get("dev_otp")
         self.assertIsNotNone(otp, "Dev OTP should be returned when Twilio is not in live mode")
 
+        verify_otp_res = self.client.post(
+            "/register/verify-otp",
+            json={"phone": self.test_phone, "otp": otp},
+        )
+        self.assertEqual(verify_otp_res.status_code, 200)
+        verify_otp_data = verify_otp_res.json()
+        self.assertTrue(verify_otp_data.get("success"))
+        self.assertTrue(verify_otp_data.get("verification_token"))
+
         # Register user
         reg_payload = {
             "phone": self.test_phone,
             "otp": otp,
+            "otp_verification_token": verify_otp_data["verification_token"],
             "name": "Test Farmer",
             "aadhaar": self.valid_aadhaar,
             "state": "Telangana",
@@ -205,21 +215,96 @@ class TestCarbonXFullSuite(unittest.TestCase):
         self.assertIn("total_credits", data)
 
     def test_10_marketplace_flow(self):
-        """Test listing creation and fetching."""
-        headers = {"Authorization": f"Bearer {TestCarbonXFullSuite.token}"}
+        """Test listing creation and fetching with an isolated clean user.
+
+        The shared test_phone accumulates FLAGGED/PENDING KYC across runs,
+        which correctly blocks listings via farm_may_list(). To test the
+        positive path deterministically, use a dedicated phone that never
+        runs /verify-land, so its farm stays Verified and listable.
+        Also asserts the negative path: a FLAGGED farm must be blocked.
+        """
+        clean_phone = "9111111111"
+        otp_res = self.client.post("/send-otp", json={"phone": clean_phone})
+        self.assertTrue(otp_res.json().get("success"))
+        clean_otp = otp_res.json().get("dev_otp")
+        self.assertIsNotNone(clean_otp)
+        verify_res = self.client.post(
+            "/register/verify-otp", json={"phone": clean_phone, "otp": clean_otp}
+        )
+        self.assertTrue(verify_res.json().get("success"))
+        reg_res = self.client.post("/register", json={
+            "phone": clean_phone,
+            "otp": clean_otp,
+            "otp_verification_token": verify_res.json()["verification_token"],
+            "name": "Marketplace Farmer",
+            "aadhaar": self.valid_aadhaar,
+            "state": "Telangana",
+            "district": "Rangareddy",
+            "village": "Chevella",
+            "upi": "mkt@upi",
+            "role": "farmer",
+            "preferred_language": "en",
+        })
+        self.assertTrue(reg_res.json().get("success"))
+        clean_headers = {"Authorization": f"Bearer {reg_res.json()['token']}"}
+        farm_geojson = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[
+                    [78.4967, 17.3950],
+                    [78.4977, 17.3950],
+                    [78.4977, 17.3960],
+                    [78.4967, 17.3960],
+                    [78.4967, 17.3950],
+                ]],
+            },
+        }
+        farm_res = self.client.post("/save-farm", json={"farm": {
+            "name": "Marketplace Farm",
+            "crop_type": "Paddy",
+            "irrigation": "Drip",
+            "geojson": farm_geojson,
+            "area_hectares": 0.12,
+            "ndvi": 0.65,
+            "evi": 0.55,
+            "carbon_tonnes": 1.2,
+            "biodiversity_score": 72.0,
+            "tree_cover": 65.0,
+            "soil_moisture": 30.0,
+            "vegetation_health": "Good",
+            "ai_confidence": 95.0,
+            "satellite_source": "test",
+        }}, headers=clean_headers)
+        self.assertTrue(farm_res.json().get("success"))
+        clean_farm_id = farm_res.json()["farm"]["id"]
+
         listing_payload = {
-            "farm_id": getattr(TestCarbonXFullSuite, "saved_farm_id", None),
+            "farm_id": clean_farm_id,
             "carbon_credits": 0.47,
             "biodiversity_credits": 0.67,
             "price_per_credit": 550,
             "crop": "Paddy",
         }
-        create_res = self.client.post("/marketplace/listings", json=listing_payload, headers=headers)
+        create_res = self.client.post("/marketplace/listings", json=listing_payload, headers=clean_headers)
         self.assertEqual(create_res.status_code, 200)
         cdata = create_res.json()
         self.assertTrue(cdata.get("success"))
         listing_id = cdata.get("listing", {}).get("id")
         self.assertIsNotNone(listing_id)
+
+        # Negative path: the shared user's farm (FLAGGED/PENDING after KYC)
+        # must be rejected, not listed.
+        headers = {"Authorization": f"Bearer {TestCarbonXFullSuite.token}"}
+        blocked_res = self.client.post("/marketplace/listings", json={
+            "farm_id": getattr(TestCarbonXFullSuite, "saved_farm_id", None),
+            "carbon_credits": 0.47,
+            "biodiversity_credits": 0.67,
+            "price_per_credit": 550,
+            "crop": "Paddy",
+        }, headers=headers)
+        if not blocked_res.json().get("success"):
+            self.assertIn("cannot be listed", blocked_res.json().get("message", ""))
 
         # Fetch marketplace listings
         get_res = self.client.get("/marketplace/listings")

@@ -66,10 +66,10 @@ Credit listings for sale. PK `id`. FKs: `farm_id` → `farms.id`, `farmer_phone`
 Columns: `id`, `farm_id`, `farmer_phone`, `farmer_name`, `crop`, `location`, `size_label`, `listing_model`, `price_per_credit`, `current_bid`, `bids_count`, `total_credits`, `carbon_credits`, `biodiversity_credits`, `status`, `expires_at`, `image_url`, `token_id`, `tx_hash`, `created_at`, `updated_at`
 Indexes: `marketplace_listings_pkey`, `idx_listings_status`, `marketplace_listings_status_idx`, `marketplace_listings_farmer_phone_idx`
 
-### otp_codes
-Phone OTP login. PK `phone` (no separate id).
-Columns: `phone`, `otp`, `expires_at`, `created_at`
-Index: `otp_codes_pkey`
+### OTP storage
+Phone OTPs are stored in Redis at runtime under `carbonx:otp:<phone>` with a
+180-second TTL. The legacy `otp_codes` Supabase table remains in the schema
+for compatibility but is not used by the authentication pipeline.
 
 ### corporates
 Corporate buyers. PK `c_id` (auto int).
