@@ -1,40 +1,103 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sprout, Satellite, Link2, Wallet, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Compass, Leaf, Wallet, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export default function WelcomeTutorial() {
   const navigate = useNavigate();
-  const [slide, setSlide] = useState(0);
+  const [slideIndex, setSlideIndex] = useState(0);
 
-  const slides = [
-    { title: 'Earn from Ecological Practices', desc: 'By engaging in zero-tillage, planting cover crops, or planting teak trees, your farm absorbs carbon from the air. This carbon has commercial value globally.', icon: Sprout, bg: 'bg-forest-50', color: 'text-forest-700' },
-    { title: 'Geospatial Satellites Scan Your Farm', desc: 'Our platform integrates with Sentinel-2 and Landsat GIS trackers to scan your field vegetative index (NDVI). No paperwork or middleman inspections needed.', icon: Satellite, bg: 'bg-sky-50', color: 'text-sky-700' },
-    { title: 'Tokenized Blockchain Credits', desc: 'Your environmental impact mints premium ERC-1155 carbon credits. These digital assets are verified by ISRO compatibility and smart-contract parameters.', icon: Link2, bg: 'bg-purple-50', color: 'text-purple-700' },
-    { title: 'Direct UPI Bank Payments', desc: 'Corporate buyers bid on your credits directly in our transparent market. Once sold, funds are instantaneously transferred to your linked UPI bank account.', icon: Wallet, bg: 'bg-amber-50', color: 'text-amber-700' },
+  const steps = [
+    {
+      step: 1,
+      title: 'Satellite Land Mapping',
+      desc: 'Draw or auto-import your farm boundary. Sentinel-2 and ISRO Bhuvan satellite feeds index your parcel geometry automatically.',
+      icon: Compass,
+      bgColor: 'bg-emerald-50 text-emerald-800 border-emerald-200'
+    },
+    {
+      step: 2,
+      title: 'Soil & Biomass Credits',
+      desc: 'AI and multi-spectral NDVI models compute your seasonal vegetative canopy and soil organic carbon sequestration yield.',
+      icon: Leaf,
+      bgColor: 'bg-sky-50 text-sky-800 border-sky-200'
+    },
+    {
+      step: 3,
+      title: 'Direct UPI Payouts',
+      desc: 'Corporate buyers purchase your verified carbon credits. Earnings are transferred directly into your linked UPI bank account.',
+      icon: Wallet,
+      bgColor: 'bg-amber-50 text-amber-800 border-amber-200'
+    }
   ];
 
-  const current = slides[slide];
-  const Icon = current.icon;
+  const currentStep = steps[slideIndex];
+  const Icon = currentStep.icon;
+
+  const handleNext = () => {
+    if (slideIndex < steps.length - 1) {
+      setSlideIndex(slideIndex + 1);
+    } else {
+      navigate('/farmer/dashboard');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-warm-white flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="flex justify-between items-center mb-6">
-          <button onClick={() => slide > 0 ? setSlide(slide - 1) : navigate('/dashboard')} className="p-2 hover:bg-forest-50 rounded-xl text-carbon-600"><ArrowLeft size={20} /></button>
-          <div className="flex gap-1.5">
-            {slides.map((_, i) => (<div key={i} className={`h-1.5 rounded-full transition-all ${i === slide ? 'w-6 bg-forest-700' : 'w-1.5 bg-forest-200'}`} />))}
+    <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900 py-10 px-4 flex flex-col items-center justify-center">
+      <div className="max-w-md w-full space-y-6">
+
+        {/* Top Progress & Skip */}
+        <div className="flex justify-between items-center">
+          <button
+            onClick={() => slideIndex > 0 ? setSlideIndex(slideIndex - 1) : navigate('/farmer/dashboard')}
+            className="p-2 hover:bg-slate-200 rounded-lg text-slate-700"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+
+          {/* Progress Dot Indicators */}
+          <div className="flex gap-2">
+            {steps.map((_, idx) => (
+              <div
+                key={idx}
+                className={`h-2 rounded-full transition-all ${
+                  idx === slideIndex ? 'w-6 bg-[#1B4332]' : 'w-2 bg-slate-300'
+                }`}
+              />
+            ))}
           </div>
-          <button onClick={() => navigate('/dashboard')} className="text-xs font-bold text-carbon-400 hover:text-forest-700">Skip</button>
+
+          <button
+            onClick={() => navigate('/farmer/dashboard')}
+            className="text-xs font-bold text-slate-500 hover:text-slate-900"
+          >
+            Skip
+          </button>
         </div>
-        <div className="bg-white border border-forest-100 rounded-3xl p-8 shadow-card text-center">
-          <div className={`w-20 h-20 ${current.bg} ${current.color} rounded-3xl flex items-center justify-center mx-auto mb-6`}><Icon size={36} /></div>
-          <h2 className="text-xl font-manrope font-bold text-carbon-900 mb-3">{current.title}</h2>
-          <p className="text-xs text-carbon-500 leading-relaxed">{current.desc}</p>
+
+        {/* Walkthrough Slide Card */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-8 text-center space-y-5">
+          <div className={`w-16 h-16 rounded-xl flex items-center justify-center mx-auto border ${currentStep.bgColor}`}>
+            <Icon className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Step {currentStep.step} of 3
+            </span>
+            <h2 className="text-xl font-extrabold text-slate-900 font-manrope">{currentStep.title}</h2>
+            <p className="text-xs text-slate-600 leading-relaxed">{currentStep.desc}</p>
+          </div>
         </div>
-        <button onClick={() => slide < slides.length - 1 ? setSlide(slide + 1) : navigate('/farm-map')}
-          className="w-full mt-6 py-3.5 bg-forest-800 text-white rounded-2xl text-sm font-bold hover:bg-forest-900 transition-colors flex items-center justify-center gap-2">
-          {slide < slides.length - 1 ? 'Next' : 'Start Mapping Your Farm'} <ArrowRight size={16} />
+
+        {/* Next Button */}
+        <button
+          onClick={handleNext}
+          className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+        >
+          <span>{slideIndex < steps.length - 1 ? 'Next Step' : 'Proceed to My Farm'}</span>
+          <ArrowRight className="w-4 h-4" />
         </button>
+
       </div>
     </div>
   );

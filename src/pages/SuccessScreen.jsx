@@ -1,72 +1,70 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ArrowRight, Satellite, Leaf, Wallet } from 'lucide-react';
-import { combinedCredits } from '../services/api';
-
-const CREDIT_PRICE = 520;
+import { CheckCircle2, ArrowRight, Calendar, Users, Wallet } from 'lucide-react';
 
 export default function SuccessScreen() {
   const navigate = useNavigate();
-  const [analysis, setAnalysis] = useState(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('carbonx_last_analysis');
-      if (saved) setAnalysis(JSON.parse(saved));
-    } catch {}
-  }, []);
-
-  const credits = analysis ? combinedCredits(analysis).total : 0;
-  const annualValue = Math.round(credits * CREDIT_PRICE);
 
   return (
-    <div className="min-h-screen bg-warm-white flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="bg-white border border-forest-100 rounded-3xl p-8 shadow-card text-center">
-          <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 size={36} className="text-forest-700" />
+    <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-10 px-4 flex items-center justify-center">
+      <div className="max-w-lg w-full space-y-6">
+
+        {/* Enrollment Summary Card */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 text-center space-y-4">
+          <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-700 mx-auto">
+            <CheckCircle2 className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-manrope font-bold text-carbon-900">Satellite Scan Complete</h2>
-          <p className="text-xs text-carbon-500 mt-2 leading-relaxed">
-            Your farmland boundary was analyzed with Sentinel-2 satellite imagery and ML biodiversity scoring.
-          </p>
 
-          {analysis && (
-            <div className="grid grid-cols-3 gap-3 mt-6">
-              <div className="bg-forest-50/50 rounded-xl p-3">
-                <Satellite size={18} className="mx-auto text-forest-600 mb-1" />
-                <p className="text-[9px] uppercase text-carbon-400 font-bold">NDVI</p>
-                <p className="text-sm font-black text-carbon-900">{analysis.ndvi || '0.52'}</p>
-              </div>
-              <div className="bg-forest-50/50 rounded-xl p-3">
-                <Leaf size={18} className="mx-auto text-forest-600 mb-1" />
-                <p className="text-[9px] uppercase text-carbon-400 font-bold">Credits</p>
-                <p className="text-sm font-black text-carbon-900">{credits}</p>
-              </div>
-              <div className="bg-forest-50/50 rounded-xl p-3">
-                <Wallet size={18} className="mx-auto text-forest-600 mb-1" />
-                <p className="text-[9px] uppercase text-carbon-400 font-bold">Value/yr</p>
-                <p className="text-sm font-black text-carbon-900">₹{annualValue.toLocaleString('en-IN')}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 pt-6 border-t border-forest-50">
-            <p className="text-[10px] text-carbon-400 uppercase tracking-wider font-bold mb-3">Next Steps</p>
-            <p className="text-xs text-carbon-500 leading-relaxed">
-              Complete KYC verification to mint your carbon credits and start earning.
+          <div>
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+              Farm Enrollment Confirmed
+            </span>
+            <h1 className="text-2xl font-extrabold text-slate-900 font-manrope mt-2">
+              Welcome to CarbonX Network
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Your farmland parcel has been officially cataloged in the Telangana Carbon Sequestration Registry.
             </p>
           </div>
+
+          {/* Next Steps Breakdown */}
+          <div className="space-y-3 pt-2 text-left">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Next Step Schedule</h3>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-start gap-3">
+              <Calendar className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-slate-900">Seasonal Satellite Re-Scan Date</p>
+                <p className="text-[11px] text-slate-600">October 15, 2026 : Post-Kharif Sentinel-2 biomass sweep.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-start gap-3">
+              <Users className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-slate-900">Cooperative Credit Pooling Window</p>
+                <p className="text-[11px] text-slate-600">Yaadadri Laxmi Narsimha FPC bulk order matching active.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-start gap-3">
+              <Wallet className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-slate-900">Direct UPI Payout Ledger</p>
+                <p className="text-[11px] text-slate-600">Automated settlement triggered upon corporate buyer execution.</p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/farmer/dashboard')}
+            className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 mt-4"
+          >
+            <span>Access Farmer Command Center</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <button onClick={() => navigate('/farm-verification')} className="py-3.5 bg-forest-800 text-white rounded-2xl text-xs font-bold hover:bg-forest-900 transition-colors flex items-center justify-center gap-1.5">
-            Verify KYC <ArrowRight size={14} />
-          </button>
-          <button onClick={() => navigate('/dashboard')} className="py-3.5 bg-white border border-forest-200 text-carbon-800 rounded-2xl text-xs font-bold hover:bg-forest-50 transition-colors">
-            Go to Dashboard
-          </button>
-        </div>
       </div>
     </div>
   );

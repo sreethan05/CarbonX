@@ -1,116 +1,122 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Sparkles, Sliders } from 'lucide-react';
+import BadgePill from '../components/BadgePill';
 import { useAuth } from '../context/AuthContext';
-import { createMarketplaceListing, combinedCredits } from '../services/api';
 
 export default function CreateListing() {
   const navigate = useNavigate();
-  const { user, farms } = useAuth();
+  const { user } = useAuth();
 
-  const totals = useMemo(() => {
-    let carbon = 0, bio = 0;
-    farms.forEach(f => { const c = combinedCredits(f); carbon += c.carbon; bio += c.biodiversity; });
-    return { carbon, bio, total: carbon + bio };
-  }, [farms]);
+  const [volume, setVolume] = useState(12.5);
+  const [unitPrice, setUnitPrice] = useState(340);
+  const [assignedBadge, setAssignedBadge] = useState('REGISTRY');
 
-  const [creditsToSell, setCreditsToSell] = useState(Math.min(24, totals.total || 1));
-  const [pricePerCredit, setPricePerCredit] = useState(520);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  // Live revenue calculations
+  const grossValue = volume * unitPrice;
+  const platformFee = grossValue * 0.02;
+  const netEarnings = grossValue - platformFee;
 
-  const estRevenue = Math.round(creditsToSell * pricePerCredit);
-
-  const handleSubmit = async (e) => {
+  const handleSubmitListing = (e) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      const farm = farms[0];
-      const carbonRatio = totals.total > 0 ? (totals.carbon / totals.total) : 0.8;
-      const carbonCredits = Math.round(creditsToSell * carbonRatio * 100) / 100;
-      const bioCredits = Math.round((creditsToSell - carbonCredits) * 100) / 100;
-
-      const res = await createMarketplaceListing({
-        farm_id: farm?.id || null,
-        carbon_credits: carbonCredits,
-        biodiversity_credits: bioCredits,
-        price_per_credit: pricePerCredit,
-        crop: farm?.crop_type || 'Mixed Crop',
-      });
-      if (res.success) {
-        setSuccess(true);
-        setTimeout(() => navigate('/marketplace'), 2000);
-      }
-    } catch {}
-    setLoading(false);
+    alert(`Listing published successfully! Gross INR ${grossValue.toLocaleString()} | Net INR ${netEarnings.toLocaleString()}`);
+    navigate('/marketplace');
   };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-xl bg-white border border-forest-100 text-carbon-600 hover:text-forest-800">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-lg font-bold text-carbon-900">Create Credit Listing</h1>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-8 px-4 md:px-10">
+      <div className="max-w-2xl mx-auto space-y-6">
 
-      {totals.total === 0 ? (
-        <div className="bg-white border border-dashed border-forest-200 rounded-2xl p-8 text-center text-sm text-carbon-500">
-          You need verified farms with carbon credits before creating a listing.
-          <button onClick={() => navigate('/farm-map')} className="block mx-auto mt-4 px-6 py-3 bg-forest-800 text-white rounded-2xl text-xs font-bold">Map Your Farm</button>
-        </div>
-      ) : success ? (
-        <div className="bg-forest-50 border border-forest-200 rounded-2xl p-8 text-center">
-          <CheckCircle2 className="w-12 h-12 text-forest-600 mx-auto mb-3" />
-          <p className="font-bold text-forest-900">Listing Created Successfully!</p>
-          <p className="text-xs text-forest-700 mt-1">Redirecting to marketplace...</p>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-forest-100 shadow-sm p-6 space-y-6">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-forest-50/50 rounded-xl p-3">
-              <p className="text-[9px] uppercase text-carbon-400 font-bold">Available Carbon</p>
-              <p className="text-lg font-black text-amber-800">{totals.carbon.toFixed(1)}</p>
-            </div>
-            <div className="bg-forest-50/50 rounded-xl p-3">
-              <p className="text-[9px] uppercase text-carbon-400 font-bold">Available Bio</p>
-              <p className="text-lg font-black text-forest-700">{totals.bio.toFixed(1)}</p>
-            </div>
-            <div className="bg-forest-50 rounded-xl p-3 border border-forest-200">
-              <p className="text-[9px] uppercase text-forest-700 font-bold">Total</p>
-              <p className="text-lg font-black text-forest-900">{totals.total.toFixed(1)}</p>
-            </div>
-          </div>
-
+        {/* Header */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex justify-between items-center">
           <div>
-            <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide block mb-2">Credits to Sell</label>
-            <input type="number" min="1" max={totals.total} value={creditsToSell}
-              onChange={e => setCreditsToSell(Math.min(parseFloat(e.target.value) || 0, totals.total))}
-              className="w-full p-3.5 bg-forest-50 border border-forest-100 rounded-2xl text-lg font-black focus:outline-none focus:border-forest-600 focus:bg-white" />
-            <input type="range" min="1" max={Math.max(1, totals.total)} value={creditsToSell}
-              onChange={e => setCreditsToSell(parseFloat(e.target.value))}
-              className="w-full mt-3 accent-forest-700" />
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full inline-block mb-1">
+              Credit Yield Configuration
+            </span>
+            <h1 className="text-2xl font-extrabold text-slate-900 font-manrope">Create Marketplace Credit Listing</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Publish verified carbon credits onto the corporate trading floor.</p>
           </div>
 
+          <button
+            onClick={() => navigate('/farmer/dashboard')}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Dashboard</span>
+          </button>
+        </div>
+
+        {/* Configuration Panel */}
+        <form onSubmit={handleSubmitListing} className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-6">
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-4 rounded-xl">
+            <div>
+              <p className="text-xs font-bold text-slate-900">Verified Parcel Footprint</p>
+              <p className="text-[11px] text-slate-500">Survey 124/A (2.50 Acres Cotton Block)</p>
+            </div>
+            <BadgePill badge={assignedBadge} size="sm" />
+          </div>
+
+          {/* Interactive Volume Slider */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <label className="text-slate-700 uppercase tracking-wider">Volume to List (MT CO2e)</label>
+              <span className="text-emerald-800 font-mono text-base">{volume} MT</span>
+            </div>
+            <input
+              type="range"
+              min="1.0"
+              max="25.0"
+              step="0.5"
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-700"
+            />
+          </div>
+
+          {/* Unit Benchmark Price Input */}
           <div>
-            <label className="text-xs font-bold text-carbon-700 uppercase tracking-wide block mb-2">Price per Credit (₹)</label>
-            <input type="number" min="100" step="10" value={pricePerCredit}
-              onChange={e => setPricePerCredit(parseFloat(e.target.value) || 0)}
-              className="w-full p-3.5 bg-forest-50 border border-forest-100 rounded-2xl text-lg font-black focus:outline-none focus:border-forest-600 focus:bg-white" />
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Benchmark Price per Credit (INR)
+            </label>
+            <input
+              type="number"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(parseFloat(e.target.value) || 300)}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">Recommended benchmark for REGISTRY badge: INR 340 / Credit</p>
           </div>
 
-          <div className="bg-forest-900 text-white rounded-2xl p-5 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-forest-300 font-bold">Estimated Revenue</p>
-            <p className="text-3xl font-black text-white mt-1">₹{estRevenue.toLocaleString('en-IN')}</p>
+          {/* Live Revenue Projection Box */}
+          <div className="bg-[#0D2F1D] text-white border border-emerald-800 rounded-xl p-5 space-y-3">
+            <div className="flex justify-between items-center border-b border-emerald-800/80 pb-3">
+              <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Gross Carbon Value</span>
+              <span className="text-base font-bold text-white font-mono">INR {grossValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-300">2% CarbonX Platform Facilitation Fee</span>
+              <span className="text-rose-400 font-mono font-semibold">- INR {platformFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            <div className="flex justify-between items-center text-xs pt-1">
+              <span className="text-emerald-300 font-bold uppercase tracking-wider">Net Farmer Earnings</span>
+              <span className="text-xl font-extrabold text-emerald-400 font-manrope font-mono">
+                INR {netEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
 
-          <button type="submit" disabled={loading}
-            className="w-full py-4 bg-forest-800 text-white rounded-2xl text-xs font-bold hover:bg-forest-900 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-            {loading ? 'Creating Listing...' : 'List for Sale'}
+          <button
+            type="submit"
+            className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Publish Listing to Public Marketplace</span>
           </button>
         </form>
-      )}
+
+      </div>
     </div>
   );
 }

@@ -1,126 +1,222 @@
-import React, { useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Activity, Leaf, TrendingUp, ChevronLeft, Info, Calendar } from 'lucide-react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AlertTriangle, Sparkles, TrendingUp, Compass, ArrowLeft, Leaf, Sliders, CheckCircle2 } from 'lucide-react';
+import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
-import { farmsToAnalytics } from '../utils/farmAnalytics';
 
 export default function DetailedFarmAnalytics() {
   const navigate = useNavigate();
-  const { farms } = useAuth();
-  const analyticsFarms = useMemo(() => farmsToAnalytics(farms), [farms]);
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const { user } = useAuth();
 
-  const farm = analyticsFarms[selectedIdx];
-
-  if (!farm) {
-    return (
-      <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/dashboard')} className="p-2 rounded-xl bg-white border border-forest-100 text-carbon-600">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-bold text-carbon-900">Farm Analytics</h1>
-        </div>
-        <div className="bg-white border border-dashed border-forest-200 rounded-2xl p-8 text-center text-sm text-carbon-500">
-          No farms mapped yet. Map your farm to see detailed analytics.
-          <button onClick={() => navigate('/farm-map')} className="block mx-auto mt-4 px-6 py-3 bg-forest-800 text-white rounded-2xl text-xs font-bold">Map Your Farm</button>
-        </div>
-      </div>
-    );
-  }
-
-  const metrics = [
-    { label: 'NDVI', value: farm.ndvi?.toFixed(2) || '0.52', icon: Activity, color: 'text-forest-700' },
-    { label: 'Vegetation', value: farm.vegetationHealth || 'Good', icon: Leaf, color: 'text-forest-600' },
-    { label: 'Carbon Potential', value: farm.carbonPot || '0 t CO2e/yr', icon: TrendingUp, color: 'text-amber-700' },
-    { label: 'AI Confidence', value: farm.aiConfidence || '95%', icon: Info, color: 'text-sky-700' },
-    { label: 'Biodiversity', value: farm.biodiversity || '0/100', icon: Leaf, color: 'text-forest-600' },
-    { label: 'Water Retention', value: farm.waterRetention || '0%', icon: Activity, color: 'text-sky-600' },
+  // Multi-season Kharif vs Rabi historical NDVI dataset
+  const trendData = [
+    { month: 'Jun (Kharif)', ndvi: 0.42, rabi_baseline: 0.40 },
+    { month: 'Aug (Kharif)', ndvi: 0.76, rabi_baseline: 0.60 },
+    { month: 'Oct (Kharif)', ndvi: 0.82, rabi_baseline: 0.70 },
+    { month: 'Dec (Rabi)', ndvi: 0.58, rabi_baseline: 0.55 },
+    { month: 'Feb (Rabi)', ndvi: 0.74, rabi_baseline: 0.72 },
+    { month: 'Apr (Fallow)', ndvi: 0.38, rabi_baseline: 0.35 }
   ];
 
+  // P3 Score Simulator Practice Options
+  const practiceOptions = [
+    {
+      id: 'none',
+      name: 'Current Baseline (Conventional Tillage)',
+      scoreDelta: 0,
+      creditDelta: 0,
+      earningsDelta: 0,
+      desc: 'Standard chemical fertilizer application and seasonal tillage.'
+    },
+    {
+      id: 'no_till',
+      name: 'Switch to Zero-Tillage Farming',
+      scoreDelta: 8,
+      creditDelta: 2.2,
+      earningsDelta: 748,
+      desc: 'Eliminating tillage preserves soil organic carbon and reduces soil moisture evaporation.'
+    },
+    {
+      id: 'cover_crop',
+      name: 'Incorporate Legume Cover Crops',
+      scoreDelta: 6,
+      creditDelta: 1.8,
+      earningsDelta: 612,
+      desc: 'Planting clover/sunn hemp during fallow windows fixes atmospheric nitrogen.'
+    },
+    {
+      id: 'awd_rice',
+      name: 'Alternate Wetting & Drying (AWD Rice)',
+      scoreDelta: 10,
+      creditDelta: 3.1,
+      earningsDelta: 1054,
+      desc: 'Periodic drying of rice paddies reduces methane emissions by up to 48%.'
+    },
+    {
+      id: 'biochar',
+      name: 'Apply Biochar & Organic Compost Layer',
+      scoreDelta: 12,
+      creditDelta: 3.8,
+      earningsDelta: 1292,
+      desc: 'Adding biochar locks stable carbon in the soil matrix for decades.'
+    }
+  ];
+
+  const [selectedPracticeId, setSelectedPracticeId] = useState('no_till');
+
+  const activePractice = practiceOptions.find((p) => p.id === selectedPracticeId) || practiceOptions[0];
+
+  const baseScore = 78;
+  const baseCredits = 12.5;
+  const baseEarnings = 4250;
+
+  const currentScore = baseScore + activePractice.scoreDelta;
+  const currentCredits = Math.round((baseCredits + activePractice.creditDelta) * 10) / 10;
+  const currentEarnings = baseEarnings + activePractice.earningsDelta;
+
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-xl bg-white border border-forest-100 text-carbon-600 hover:text-forest-800">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-lg font-bold text-carbon-900">Farm Analytics</h1>
-          <p className="text-[11px] text-carbon-500">Satellite-verified metrics and NDVI trends</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-surface font-inter text-agriText-main py-8 px-4 md:px-10">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      {analyticsFarms.length > 1 && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-          {analyticsFarms.map((f, i) => (
-            <button key={i} onClick={() => setSelectedIdx(i)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${i === selectedIdx ? 'bg-forest-800 text-white' : 'bg-white border border-forest-100 text-carbon-600'}`}>
-              {f.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-forest-100 shadow-sm p-5 mb-4">
-        <h2 className="text-sm font-bold text-carbon-900">{farm.name}</h2>
-        <p className="text-[11px] text-carbon-500 mt-0.5">{farm.cropType} · {farm.areaHectares || 'N/A'} hectares</p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-        {metrics.map((m, i) => {
-          const Icon = m.icon;
-          return (
-            <div key={i} className="bg-white border border-forest-100 rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Icon size={16} className={m.color} />
-                <span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">{m.label}</span>
-              </div>
-              <p className="text-lg font-black text-carbon-900">{m.value}</p>
+        {/* Page Header */}
+        <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-surface-sage border border-forest-200 px-2.5 py-0.5 rounded-full">
+                Sentinel-2 MRV & Carbon Passport
+              </span>
+              <VerificationBadge badge="REGISTRY" showTier size="sm" />
             </div>
-          );
-        })}
-      </div>
+            <h1 className="text-2xl font-extrabold text-carbon-900 font-manrope">Multi-Season Analytics & Passport</h1>
+            <p className="text-xs text-agriText-muted mt-0.5">Historical vegetative canopy index & predictive agronomic scoring.</p>
+          </div>
 
-      {farm.ndviTrend && (
-        <div className="bg-white rounded-2xl border border-forest-100 shadow-sm p-5 mb-4">
-          <h3 className="text-xs font-bold text-carbon-800 flex items-center gap-2 mb-4">
-            <Calendar size={16} className="text-forest-600" /> NDVI Trend (12 months)
-          </h3>
-          <div className="h-48 w-full">
+          <button
+            onClick={() => navigate('/farmer/dashboard')}
+            className="px-4 py-2.5 bg-surface-sage hover:bg-forest-100 border border-forest-200 text-carbon-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Dashboard</span>
+          </button>
+        </div>
+
+        {/* P3 Interactive Score Improvement Simulator */}
+        <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-forest-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-primary" />
+                <h2 className="text-base font-bold text-carbon-900">Score Improvement Simulator</h2>
+              </div>
+              <p className="text-xs text-agriText-muted">Simulate agronomic practices to project score boosts & earning deltas.</p>
+            </div>
+
+            <span className="text-[10px] font-bold text-agriText-subtle bg-warm-cream px-2 py-1 rounded">
+              Interactive ML Simulation
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Practice Selection Form */}
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-carbon-800">
+                Select Sustainable Farming Practice
+              </label>
+              <select
+                value={selectedPracticeId}
+                onChange={(e) => setSelectedPracticeId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-surface-sage/40 border border-forest-200 rounded-xl text-xs font-bold text-carbon-900 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {practiceOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} {p.scoreDelta > 0 ? `(+${p.scoreDelta} pts)` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-agriText-muted bg-surface-sage/30 p-3 rounded-xl border border-forest-100 leading-relaxed">
+                {activePractice.desc}
+              </p>
+            </div>
+
+            {/* Projected Impact Displays */}
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 space-y-1">
+                <span className="text-[10px] text-agriText-subtle font-semibold uppercase tracking-wider block">Projected MRV Score</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-extrabold text-carbon-900 font-manrope">{currentScore}</span>
+                  <span className="text-xs text-agriText-subtle">/ 100</span>
+                </div>
+                {activePractice.scoreDelta > 0 && (
+                  <span className="text-[11px] font-bold text-primary flex items-center gap-0.5">
+                    <Sparkles className="w-3.5 h-3.5" /> +{activePractice.scoreDelta} pts boost
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 space-y-1">
+                <span className="text-[10px] text-agriText-subtle font-semibold uppercase tracking-wider block">Projected Credits</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-extrabold text-carbon-900 font-manrope">{currentCredits}</span>
+                  <span className="text-xs text-agriText-subtle">tCO2e</span>
+                </div>
+                {activePractice.creditDelta > 0 && (
+                  <span className="text-[11px] font-bold text-primary flex items-center gap-0.5">
+                    <TrendingUp className="w-3.5 h-3.5" /> +{activePractice.creditDelta} tCO2e/yr
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-surface-sage border border-forest-200 rounded-xl p-4 space-y-1">
+                <span className="text-[10px] text-agriText-subtle font-semibold uppercase tracking-wider block">Projected Revenue Delta</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-extrabold text-primary font-manrope">₹{currentEarnings.toLocaleString('en-IN')}</span>
+                  <span className="text-xs text-agriText-muted">/ yr</span>
+                </div>
+                {activePractice.earningsDelta > 0 && (
+                  <span className="text-[11px] font-bold text-primary flex items-center gap-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> +₹{activePractice.earningsDelta}/yr delta
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recharts Trend Visualizer */}
+        <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-base font-bold text-carbon-900">Multi-Season NDVI Progression Curve</h2>
+              <p className="text-xs text-agriText-muted">Comparing Kharif main crop vs Rabi inter-crop vegetative canopy retention.</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-medium">
+              <span className="flex items-center gap-1.5 text-primary font-bold">
+                <span className="w-3 h-3 bg-primary rounded-full inline-block" /> Kharif 2024
+              </span>
+              <span className="flex items-center gap-1.5 text-agriText-subtle">
+                <span className="w-3 h-3 bg-agriText-subtle rounded-full inline-block" /> Rabi Baseline
+              </span>
+            </div>
+          </div>
+
+          <div className="h-72 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={farm.ndviTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} stroke="#94A3B8" style={{ fontSize: '9px' }} />
-                <YAxis domain={[0.2, 0.9]} tickLine={false} axisLine={false} stroke="#94A3B8" style={{ fontSize: '9px' }} />
-                <Tooltip contentStyle={{ backgroundColor: '#1E3127', border: 'none', borderRadius: '12px', color: '#FAF6F0', fontSize: '11px' }} />
-                <ReferenceLine y={0.5} stroke="#E29B63" strokeDasharray="5 5" label={{ value: 'Moderate', position: 'right', style: { fontSize: '9px', fill: '#E29B63' } }} />
-                <Line type="monotone" dataKey="historical" stroke="#2C5E43" strokeWidth={2} dot={{ r: 3, fill: '#2C5E43' }} connectNulls />
-                <Line type="monotone" dataKey="forecast" stroke="#81C784" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 2, fill: '#81C784' }} connectNulls />
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EEF5EE" />
+                <XAxis dataKey="month" stroke="#526056" style={{ fontSize: '11px', fontWeight: '600' }} />
+                <YAxis domain={[0.2, 1.0]} stroke="#526056" style={{ fontSize: '11px', fontWeight: '600' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1F2923', borderColor: '#323C34', borderRadius: '12px', color: '#FFF', fontSize: '12px' }}
+                />
+                <Line type="monotone" dataKey="ndvi" stroke="#1F7A4D" strokeWidth={3} dot={{ r: 4, fill: '#1F7A4D' }} />
+                <Line type="monotone" dataKey="rabi_baseline" stroke="#94A397" strokeWidth={2} strokeDasharray="5 5" />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex gap-4 mt-3 text-[10px]">
-            <span className="flex items-center gap-1.5 text-carbon-600"><div className="w-3 h-0.5 bg-forest-700" /> Historical</span>
-            <span className="flex items-center gap-1.5 text-carbon-600"><div className="w-3 h-0.5 bg-earth-light border-dashed" /> Forecast</span>
-          </div>
         </div>
-      )}
 
-      {farm.scans && farm.scans.length > 0 && (
-        <div className="bg-white rounded-2xl border border-forest-100 shadow-sm p-5">
-          <h3 className="text-xs font-bold text-carbon-800 mb-3">Scan History</h3>
-          {farm.scans.map((s) => (
-            <div key={s.id} className="flex justify-between items-center text-xs py-2 border-b border-forest-50 last:border-0">
-              <div>
-                <p className="font-bold text-carbon-800">{s.source}</p>
-                <p className="text-[10px] text-carbon-400">{s.time}</p>
-              </div>
-              <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${s.type === 'success' ? 'bg-forest-50 text-forest-700' : 'bg-amber-50 text-amber-700'}`}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

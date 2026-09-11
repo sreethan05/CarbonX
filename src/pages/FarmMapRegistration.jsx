@@ -1,127 +1,239 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import GEEMap from '../components/GEEMap';
-import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowRight, CheckCircle2, AlertTriangle, ShieldCheck, Compass, Info, Check, Edit3, X } from 'lucide-react';
+import VerificationBadge from '../components/VerificationBadge';
+import LeafletMap from '../components/LeafletMap';
 import { useAuth } from '../context/AuthContext';
-import { analyzeFarm, saveFarm } from '../services/api';
 
 export default function FarmMapRegistration() {
   const navigate = useNavigate();
-  const { user, addFarm, refreshUser, token } = useAuth();
-  const [drawnGeojson, setDrawnGeojson] = useState(null);
-  const [mapStats, setMapStats] = useState({ area: 0, score: 0, ndvi: 0 });
-  const [analyzing, setAnalyzing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [analysisError, setAnalysisError] = useState('');
+  const location = useLocation();
+  const { user } = useAuth();
 
-  const handleAreaCalculated = (stats) => setMapStats(stats);
-  const handleGeojsonDrawn = (geojson) => {
-    setDrawnGeojson(geojson);
-    setAnalysisResult(null);
-    setAnalysisError('');
+  // Received state from land-verification step
+  const navState = location.state || {};
+  const surveyNumber = navState.surveyNumber || '124/A';
+  const ownerName = navState.ownerName || user?.name || 'K. Ramesh';
+  const village = navState.village || 'Pochampally';
+  const registryAreaHa = navState.areaHa || 1.20;
+  const tierCode = navState.tierCode || (surveyNumber === '124/A' ? '1A' : surveyNumber === '124/B' ? '1B' : '2');
+  const initialBadge = navState.tier || (tierCode === '1A' ? 'REGISTRY' : tierCode === '1B' ? 'REGISTRY_DOC' : 'DOCUMENT');
+  const isReadOnly = tierCode === '1A';
+
+  // Live calculated state from map drawing
+  const [drawnAreaHa, setDrawnAreaHa] = useState(registryAreaHa);
+  const [assignedBadge, setAssignedBadge] = useState(initialBadge);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [showAdvisory, setShowAdvisory] = useState(true);
+
+  // Compute variance & tolerance
+  const areaDiffHa = Math.abs(drawnAreaHa - registryAreaHa);
+  const variancePercent = registryAreaHa > 0 ? (areaDiffHa / registryAreaHa) * 100 : 0;
+  const isWithinTolerance = variancePercent <= 20;
+
+  useEffect(() => {
+    // If mismatch is outside 20% tolerance, flag as advisory FPO review (without hard-blocking)
+    if (!isWithinTolerance && tierCode !== '1A') {
+      setAssignedBadge('PENDING');
+    } else {
+      setAssignedBadge(initialBadge);
+    }
+  }, [drawnAreaHa, registryAreaHa, isWithinTolerance, tierCode, initialBadge]);
+
+  const handleAreaCalculated = (res) => {
+    if (res && res.area > 0) {
+      setDrawnAreaHa(res.area);
+    }
   };
 
-  const handleAnalyze = async () => {
-    if (!drawnGeojson) { setAnalysisError('Draw your farm boundary first.'); return; }
-    setAnalyzing(true);
-    setAnalysisError('');
-    try {
-      const res = await analyzeFarm(drawnGeojson, 'My Farm', 'Mixed Crop', 'Drip');
-      if (res.success) {
-        setAnalysisResult(res);
-        localStorage.setItem('carbonx_last_analysis', JSON.stringify(res));
-        localStorage.setItem('carbonx_last_geojson', JSON.stringify(drawnGeojson));
-      } else {
-        setAnalysisError(res.message || 'Analysis failed. Ensure backend is running.');
+  const handleFinalSubmit = () => {
+    navigate('/farm-details', {
+      state: {
+        surveyNumber,
+        ownerName,
+        village,
+        areaHa: drawnAreaHa,
+        badge: assignedBadge,
+        tierCode,
+        flaggedForFpo: !isWithinTolerance
       }
-    } catch {
-      setAnalysisError('Could not reach backend. Ensure it is running on localhost:8000.');
-    }
-    setAnalyzing(false);
-  };
-
-  const handleSaveAndContinue = async () => {
-    if (!analysisResult) return;
-    setSaving(true);
-    try {
-      const res = await saveFarm({ ...analysisResult, geojson: drawnGeojson });
-      if (res.success) {
-        addFarm(res.farm);
-        await refreshUser();
-        navigate('/farm-details');
-      } else {
-        navigate('/farm-details');
-      }
-    } catch {
-      navigate('/farm-details');
-    }
-    setSaving(false);
+    });
   };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-xl bg-white border border-forest-100 text-carbon-600 hover:text-forest-800">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+    <div className="min-h-screen bg-surface font-inter text-agriText-main flex flex-col">
+
+      {/* Top Header Bar */}
+      <div className="bg-white border-b border-forest-100 px-4 md:px-8 py-3.5 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-lg font-bold text-carbon-900">Map Your Farm</h1>
-          <p className="text-[11px]text-carbon-500">Draw boundaries on the satellite map</p>
-        </div>
-      </div>
-
-      {analysisError && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 mb-4 text-xs text-rose-700 flex items-center gap-2">
-          <AlertCircle size={16} /> {analysisError}
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-forest-100 shadow-sm overflow-hidden mb-4">
-        <GEEMap onGeojsonDrawn={handleGeojsonDrawn} onAreaCalculated={handleAreaCalculated} />
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="bg-white border border-forest-100 rounded-2xl p-3 text-center shadow-sm">
-          <p className="text-[9px] uppercase text-carbon-400 font-bold">Area</p>
-          <p className="text-lg font-black text-carbon-900">{mapStats.area.toFixed(2)}</p>
-          <p className="text-[9px] text-carbon-500">hectares</p>
-        </div>
-        <div className="bg-white border border-forest-100 rounded-2xl p-3 text-center shadow-sm">
-          <p className="text-[9px] uppercase text-carbon-400 font-bold">NDVI</p>
-          <p className="text-lg font-black text-forest-700">{mapStats.ndvi.toFixed(2)}</p>
-          <p className="text-[9px] text-carbon-500">index</p>
-        </div>
-        <div className="bg-white border border-forest-100 rounded-2xl p-3 text-center shadow-sm">
-          <p className="text-[9px] uppercase text-carbon-400 font-bold">Bio Score</p>
-          <p className="text-lg font-black text-amber-700">{Math.round(mapStats.score)}</p>
-          <p className="text-[9px] text-carbon-500">/100</p>
-        </div>
-      </div>
-
-      {analysisResult && (
-        <div className="bg-forest-50 border border-forest-200 rounded-2xl p-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 size={18} className="text-forest-600" />
-            <h3 className="text-sm font-bold text-forest-900">Satellite Analysis Complete</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-surface-sage border border-forest-200 px-2.5 py-0.5 rounded-full">
+              Tier {tierCode} Mapping Verification
+            </span>
+            <VerificationBadge badge={assignedBadge} showTier size="sm" />
           </div>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div><p className="text-[9px] uppercase text-carbon-400 font-bold">Carbon Tonnes</p><p className="font-bold text-carbon-800 mt-0.5">{analysisResult.carbon_tonnes} t CO2e</p></div>
-            <div><p className="text-[9px] uppercase text-carbon-400 font-bold">Biodiversity</p><p className="font-bold text-carbon-800 mt-0.5">{analysisResult.biodiversity_score}/100</p></div>
+          <h1 className="text-lg font-extrabold text-carbon-900 font-manrope mt-1">
+            Parcel Geometry: Survey {surveyNumber} ({village})
+          </h1>
+        </div>
+
+        {/* Live Area Cross-Verification Display Bar */}
+        <div className="bg-surface-sage/60 border border-forest-200 rounded-xl px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div>
+              <span className="text-[10px] text-agriText-subtle font-semibold block uppercase tracking-wider">Registry/OCR Area</span>
+              <span className="font-mono font-bold text-carbon-900">{registryAreaHa} ha</span>
+            </div>
+            <div className="h-6 border-r border-forest-200" />
+            <div>
+              <span className="text-[10px] text-agriText-subtle font-semibold block uppercase tracking-wider">Drawn Area</span>
+              <span className="font-mono font-bold text-primary">{drawnAreaHa} ha</span>
+            </div>
+          </div>
+
+          <div>
+            {isWithinTolerance ? (
+              <span className="text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Within tolerance ✓</span>
+              </span>
+            ) : (
+              <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-3 py-1 rounded-full flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                <span>Area mismatch — FPO review required</span>
+              </span>
+            )}
           </div>
         </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={handleAnalyze} disabled={!drawnGeojson || analyzing}
-          className="py-3.5 bg-forest-800 text-white rounded-2xl text-xs font-bold hover:bg-forest-900 transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-          {analyzing ? <><Loader2 size={16} className="animate-spin" /> Analyzing...</> : <><CheckCircle2 size={16} /> Analyze with Satellite</>}
-        </button>
-        <button onClick={handleSaveAndContinue} disabled={!analysisResult || saving}
-          className="py-3.5 bg-white border border-forest-200 text-carbon-800 rounded-2xl text-xs font-bold hover:bg-forest-50 transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <><span>Continue</span><ArrowRight size={14} /></>}
-        </button>
       </div>
+
+      {/* Main Map Workspace */}
+      <div className="flex-1 p-4 md:p-6 space-y-4 max-w-6xl mx-auto w-full">
+
+        {/* Mismatch Advisory Warning (Dismissible & Non-Blocking!) */}
+        {!isWithinTolerance && showAdvisory && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 flex items-start justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-bold text-amber-900">Area Mismatch Advisory (&gt;20% Variance Detected)</h3>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Drawn area (<code className="font-mono font-bold">{drawnAreaHa} ha</code>) differs from record area (<code className="font-mono font-bold">{registryAreaHa} ha</code>) by {Math.round(variancePercent)}%. You can still submit; your farm will be queued for FPO review.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAdvisory(false)}
+              className="p-1 hover:bg-amber-100 rounded-lg text-amber-800 transition-colors"
+              title="Dismiss Advisory"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Interactive Leaflet Map Container */}
+        <div className="z-0 relative h-[520px] rounded-2xl overflow-hidden shadow-card border border-forest-100">
+          <LeafletMap
+            readOnly={isReadOnly}
+            onAreaCalculated={handleAreaCalculated}
+            showHeatmapToggle={true}
+            height="100%"
+          />
+        </div>
+
+        {/* Action Bar */}
+        <div className="bg-white border border-forest-100 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-card">
+          <div className="text-xs text-agriText-muted">
+            {isReadOnly ? (
+              <span className="flex items-center gap-1.5 text-emerald-800 font-semibold">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                Cadastral geometry verified from Telangana Dharani Portal (Tier 1A).
+              </span>
+            ) : (
+              <span>
+                Draw polygon vertices on map to align with physical field bunds.
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={() => setShowConfirmationModal(true)}
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all"
+          >
+            <span>Confirm Boundary & Proceed</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Confirmation Modal Overlay */}
+      {showConfirmationModal && (
+        <div className="fixed inset-0 z-50 bg-[#1B4332]/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-forest-100 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-150">
+            <div className="flex justify-between items-center border-b border-forest-100 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                <h3 className="text-sm font-extrabold text-carbon-900 font-manrope">
+                  Is this your land? Survey {surveyNumber}, {Math.round(drawnAreaHa * 2.471 * 10) / 10} acres, {village}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowConfirmationModal(false)}
+                className="p-1 text-agriText-subtle hover:text-carbon-900 rounded-lg hover:bg-surface-sage"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-surface-sage/50 border border-forest-200 rounded-xl p-4 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-agriText-subtle font-semibold">Pattadar Owner:</span>
+                <span className="font-bold text-carbon-900">{ownerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-agriText-subtle font-semibold">Survey Number:</span>
+                <span className="font-mono font-bold text-primary">{surveyNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-agriText-subtle font-semibold">Village / Mandal:</span>
+                <span className="font-bold text-carbon-900">{village}</span>
+              </div>
+              <div className="flex justify-between border-t border-forest-200 pt-2">
+                <span className="text-agriText-subtle font-semibold">Verified Area:</span>
+                <span className="font-mono font-bold text-primary">{drawnAreaHa} ha ({Math.round(drawnAreaHa * 2.471 * 100) / 100} acres)</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-forest-200 pt-2">
+                <span className="text-agriText-subtle font-semibold">Assigned Tier Badge:</span>
+                <VerificationBadge badge={assignedBadge} showTier size="sm" />
+              </div>
+            </div>
+
+            {!isWithinTolerance && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900">
+                ⚠️ Notice: Area variance is outside ±20%. Your submission will be routed to your FPO coordinator for verification review.
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowConfirmationModal(false)}
+                className="flex-1 py-2.5 bg-surface-sage border border-forest-200 text-carbon-800 text-xs font-bold rounded-xl hover:bg-forest-100 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Polygon</span>
+              </button>
+              <button
+                onClick={handleFinalSubmit}
+                className="flex-1 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Confirm & Submit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

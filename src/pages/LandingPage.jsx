@@ -1,130 +1,241 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Compass, Wallet, Cpu, HeartHandshake, ArrowRight, Satellite, Leaf } from 'lucide-react';
-import { getMarketplaceListings } from '../services/api';
-import { listingToAuction } from '../utils/farmAnalytics';
+import { Leaf, ArrowRight, ShieldCheck, Cpu, Globe, Users, Building2, Wallet, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [auctions, setAuctions] = useState([]);
-
-  useEffect(() => {
-    getMarketplaceListings()
-      .then((res) => {
-        if (res.success && res.listings?.length) {
-          setAuctions(res.listings.slice(0, 3).map(listingToAuction));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const pipeline = [
-    { step: '01', name: 'Register Farm', desc: 'Draw land boundaries on our ISRO-Bhuvan compatible mapping screen via Aadhaar validation.', icon: Compass },
-    { step: '02', name: 'Satellite Check', desc: 'Our AI model analyses Sentinel-2 & Landsat imagery to verify historical tree and vegetative index.', icon: Satellite },
-    { step: '03', name: 'Sequestration Model', desc: 'Machine Learning calculates net organic carbon dioxide absorbed by your crop & trees.', icon: Cpu },
-    { step: '04', name: 'Credit Tokenization', desc: 'We mint high-integrity ERC-1155 carbon credits backed by immutable satellite hashes.', icon: ShieldCheck },
-    { step: '05', name: 'UPI Direct Pay', desc: 'Corporate buyers purchase verified assets directly, triggering instant UPI bank payout.', icon: Wallet },
-  ];
+  const { currentLang, changeLanguage } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-warm-white font-inter">
-      <header className="py-3 px-4 md:px-10 bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-forest-100/60 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="w-9 h-9 bg-forest-700 rounded-xl flex items-center justify-center text-white shadow-sm"><Leaf size={18} /></div>
-          <div>
-            <span className="font-manrope font-extrabold text-xl text-forest-800 tracking-tight block leading-tight">CarbonX</span>
-            <span className="text-[9px] font-semibold text-carbon-400 hidden sm:block">Verified Carbon Sequestration</span>
+    <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900">
+      {/* Full-width Organic Green Header */}
+      <header className="sticky top-0 z-50 bg-[#1B4332] border-b border-emerald-900 text-white px-4 md:px-10 py-3.5 shadow-md">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="w-10 h-10 bg-[#2D6A4F] border border-emerald-500 rounded-xl flex items-center justify-center text-white shadow-sm">
+              <Leaf className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-manrope font-extrabold text-xl tracking-tight block leading-tight text-white">CarbonX</span>
+              <span className="text-[10px] font-medium text-emerald-200">Enterprise AgTech & Carbon Infrastructure</span>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/farmer-login')} className="text-xs font-bold text-carbon-700 hover:text-forest-800 px-3 py-1.5 rounded-xl hover:bg-forest-50 transition-colors">Login</button>
-          <button onClick={() => navigate('/role-selection')} className="text-xs font-bold text-white bg-forest-800 hover:bg-forest-900 px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5">Get Started <ArrowRight size={13} /></button>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 bg-[#2D6A4F]/60 border border-emerald-600 rounded-xl px-3 py-1.5 text-xs text-white">
+              <Globe className="w-3.5 h-3.5 text-emerald-300" />
+              <select
+                value={currentLang}
+                onChange={(e) => changeLanguage(e.target.value)}
+                className="bg-transparent border-none outline-none text-xs font-semibold text-white cursor-pointer"
+              >
+                <option value="en" className="bg-[#1B4332] text-white">English</option>
+                <option value="te" className="bg-[#1B4332] text-white">తెలుగు (Telugu)</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => navigate('/farmer/login')}
+              className="text-xs font-semibold text-emerald-100 hover:text-white px-3 py-2 rounded-xl transition-colors hidden sm:block"
+            >
+              Sign In
+            </button>
+
+            <button
+              onClick={() => navigate('/role-selection')}
+              className="text-xs font-bold text-white bg-[#2D6A4F] hover:bg-[#40916C] px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 border border-emerald-500"
+            >
+              <span>Launch Portal</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
-      <section className="relative px-4 md:px-10 pt-12 md:pt-20 pb-16 md:pb-24 overflow-hidden">
-        <div className="absolute inset-0 bg-earth-glow opacity-50" />
-        <div className="relative max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-1.5 bg-forest-50 border border-forest-100 px-3 py-1.5 rounded-full text-[10px] font-bold text-forest-800 uppercase tracking-wider mb-6">
-            <Satellite size={12} /> ISRO + Sentinel-2 + GEE Powered
+      {/* Hero Banner with authentic farmland imagery overlay */}
+      <section className="relative bg-[#1B4332] text-white py-20 px-4 md:px-10 overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=1600')] bg-cover bg-center" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1B4332]/85 via-[#1B4332]/95 to-[#1B4332]" />
+
+        <div className="relative z-10 max-w-5xl mx-auto text-center pt-6">
+          <div className="inline-flex items-center gap-2 bg-[#2D6A4F]/80 border border-emerald-400/40 px-4 py-1.5 rounded-full text-xs font-semibold text-[#D1FAE5] mb-6 shadow-inner">
+            <ShieldCheck className="w-4 h-4 text-emerald-300" />
+            <span>Government Land Registry & Sentinel-2 Satellite MRV Protocol</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-manrope font-extrabold text-carbon-900 tracking-tight leading-tight mb-4">
-            Earn Carbon Credits from<br /><span className="text-gradient-green">Sustainable Farming</span>
+
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight mb-6 font-manrope">
+            Bridge Farmers to <span className="text-emerald-300">Carbon Markets</span>
           </h1>
-          <p className="text-sm md:text-base text-carbon-500 max-w-2xl mx-auto leading-relaxed mb-8">
-            CarbonX uses satellite imagery and AI to verify your farm's carbon sequestration. Get instant UPI payouts when corporates buy your verified carbon credits.
+
+          <p className="text-lg md:text-xl text-emerald-100 max-w-3xl mx-auto leading-relaxed mb-10">
+            Scientific land verification, automated satellite indexing, and direct wallet settlements.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={() => navigate('/role-selection')} className="px-6 py-3.5 bg-forest-800 text-white rounded-2xl text-sm font-bold hover:bg-forest-900 transition-colors flex items-center justify-center gap-2 shadow-lg">Start as Farmer <ArrowRight size={16} /></button>
-            <button onClick={() => navigate('/farmer-login')} className="px-6 py-3.5 bg-white border border-forest-200 text-carbon-800 rounded-2xl text-sm font-bold hover:bg-forest-50 transition-colors flex items-center justify-center gap-2">Login to Dashboard</button>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={() => navigate('/farmer/register')}
+              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <span>Farmer Voice Registration</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => navigate('/fpo/dashboard')}
+              className="px-6 py-3.5 bg-[#2D6A4F] hover:bg-[#40916C] text-white border border-emerald-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <span>FPO Command Center</span>
+            </button>
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="px-6 py-3.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-[#D1FAE5] border border-emerald-600 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <span>Corporate Marketplace</span>
+            </button>
           </div>
         </div>
       </section>
 
-      <section className="px-4 md:px-10 py-12 md:py-16 bg-white/60 border-y border-forest-100/60">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-xl md:text-2xl font-manrope font-bold text-carbon-900 text-center mb-2">How CarbonX Works</h2>
-          <p className="text-xs text-carbon-500 text-center mb-10">From farm registration to UPI payout in 5 steps</p>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {pipeline.map((p, i) => {
-              const Icon = p.icon;
-              return (
-                <div key={i} className="relative">
-                  <div className="bg-white border border-forest-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-xl flex items-center justify-center mb-3"><Icon size={20} /></div>
-                    <span className="text-[9px] font-mono font-bold text-forest-400 uppercase tracking-wider">Step {p.step}</span>
-                    <h3 className="text-sm font-bold text-carbon-900 mt-1">{p.name}</h3>
-                    <p className="text-[11px] text-carbon-500 mt-1.5 leading-relaxed">{p.desc}</p>
-                  </div>
-                  {i < pipeline.length - 1 && (<div className="hidden md:flex absolute top-1/2 -right-2.5 -translate-y-1/2 z-10 text-forest-300"><ArrowRight size={16} /></div>)}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 md:px-10 py-12 bg-forest-900 text-white">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div><p className="text-3xl font-black text-forest-300">5-day</p><p className="text-[10px] text-white/60 uppercase tracking-wider mt-1">Satellite Revisit</p></div>
-          <div><p className="text-3xl font-black text-forest-300">256-bit</p><p className="text-[10px] text-white/60 uppercase tracking-wider mt-1">Encryption</p></div>
-          <div><p className="text-3xl font-black text-forest-300">ERC-1155</p><p className="text-[10px] text-white/60 uppercase tracking-wider mt-1">Token Standard</p></div>
-          <div><p className="text-3xl font-black text-forest-300">UPI</p><p className="text-[10px] text-white/60 uppercase tracking-wider mt-1">Instant Payouts</p></div>
-        </div>
-      </section>
-
-      {auctions.length > 0 && (
-        <section className="px-4 md:px-10 py-12">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-xl font-manrope font-bold text-carbon-900 mb-6">Live Carbon Credit Listings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {auctions.map((a) => (
-                <div key={a.id} className="bg-white border border-forest-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/marketplace')}>
-                  <div className="w-full h-32 bg-forest-100 rounded-xl mb-3 overflow-hidden"><img src={a.image} alt={a.crop} className="w-full h-full object-cover" /></div>
-                  <h3 className="text-sm font-bold text-carbon-900">{a.crop}</h3>
-                  <p className="text-[10px] text-carbon-400 mt-0.5">{a.farmer} · {a.location}</p>
-                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-forest-50">
-                    <span className="text-xs font-bold text-forest-700">{a.credits}</span>
-                    <span className="text-sm font-black text-carbon-900">{a.currentBid}</span>
-                  </div>
-                </div>
-              ))}
+      {/* Live Key Performance Indicators (Bento Grid) */}
+      <section className="max-w-7xl mx-auto px-4 md:px-10 -mt-8 relative z-20 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-xl p-6 flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-800">
+              <Leaf className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Farmland Enrolled</p>
+              <p className="text-2xl font-extrabold text-slate-900 font-manrope mt-1">14,200 Acres</p>
+              <p className="text-xs text-emerald-700 font-medium mt-0.5">Verified across 10 Telangana Mandals</p>
             </div>
           </div>
-        </section>
-      )}
 
-      <section className="px-4 md:px-10 py-16 bg-forest-50 border-t border-forest-100">
-        <div className="max-w-2xl mx-auto text-center">
-          <HeartHandshake className="w-12 h-12 text-forest-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-manrope font-bold text-carbon-900 mb-3">Ready to Start?</h2>
-          <p className="text-sm text-carbon-500 mb-6">Join CarbonX today and turn your sustainable farming practices into carbon credits.</p>
-          <button onClick={() => navigate('/role-selection')} className="px-8 py-3.5 bg-forest-800 text-white rounded-2xl text-sm font-bold hover:bg-forest-900 transition-colors flex items-center gap-2 mx-auto shadow-lg">Choose Your Role <ArrowRight size={16} /></button>
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-xl p-6 flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-800">
+              <Cpu className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Verified CO2 Sequestered</p>
+              <p className="text-2xl font-extrabold text-slate-900 font-manrope mt-1">285.4K Tonnes</p>
+              <p className="text-xs text-emerald-700 font-medium mt-0.5">Indexed via Sentinel-2 multi-spectral NDVI</p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-xl p-6 flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-800">
+              <Wallet className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Farmer Disbursements</p>
+              <p className="text-2xl font-extrabold text-slate-900 font-manrope mt-1">INR 12.4 Cr</p>
+              <p className="text-xs text-emerald-700 font-medium mt-0.5">Direct UPI payout with 2% escrow fee split</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <footer className="py-6 px-4 md:px-10 bg-carbon-900 text-white/60 text-center text-xs">
-        <p>CarbonX · SIH 2026 · Verified Carbon Sequestration for Indian Farmers</p>
+      {/* Institutional Trust Ribbon */}
+      <section className="bg-[#1B4332] text-emerald-100 py-6 border-y border-emerald-900 mb-16">
+        <div className="max-w-7xl mx-auto px-4 md:px-10 flex flex-wrap justify-between items-center gap-6 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <span>ISRO Bhuvan Compatible</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <span>Sentinel-2 Multi-Spectral NDVI</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <span>PostGIS Boundary Verification</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <span>Direct UPI Escrow Settlement</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Portal Navigation Cards */}
+      <section className="max-w-7xl mx-auto px-4 md:px-10 mb-20">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 font-manrope">Ecosystem Access Portals</h2>
+          <p className="text-sm text-slate-600 mt-2">Select your role to access dedicated tools and verification workflows.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Farmer Card */}
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-xl p-6 flex flex-col justify-between hover:border-emerald-500 transition-all">
+            <div>
+              <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-800 mb-4">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Farmer Onboarding & Passport</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Voice assistance onboarding in Telugu/English, land verification, satellite reality check, and direct UPI payout ledger.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/farmer/register')}
+              className="mt-6 w-full py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <span>Register / Login as Farmer</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* FPO Card */}
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-xl p-6 flex flex-col justify-between hover:border-emerald-500 transition-all">
+            <div>
+              <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-800 mb-4">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">FPO & Cooperative Command Center</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Bulk member onboarding, flagged record ground-truth inspector, cooperative credit pooling, and certificate management.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/fpo/dashboard')}
+              className="mt-6 w-full py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <span>Access FPO Desk</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Corporate Card */}
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-xl p-6 flex flex-col justify-between hover:border-emerald-500 transition-all">
+            <div>
+              <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-800 mb-4">
+                <Globe className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Corporate Buyer Marketplace</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Filter verified credits by badge tier, run bulk auto-match allocation algorithms, and manage Scope 1-3 retirement certificates.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="mt-6 w-full py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <span>Explore Credit Marketplace</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-[#1B4332] text-emerald-100 py-8 border-t border-emerald-900 text-center text-xs">
+        <div className="max-w-7xl mx-auto px-4 md:px-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p>CarbonX Platform: Enterprise Institutional AgTech Ecosystem</p>
+          <div className="flex gap-4">
+            <button onClick={() => navigate('/role-selection')} className="hover:text-white transition-colors">Role Portal</button>
+            <button onClick={() => navigate('/marketplace')} className="hover:text-white transition-colors">Marketplace</button>
+            <button onClick={() => navigate('/fpo/dashboard')} className="hover:text-white transition-colors">FPO Desk</button>
+          </div>
+        </div>
       </footer>
     </div>
   );

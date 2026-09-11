@@ -1,178 +1,285 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, ArrowDownLeft, CheckCircle, ChevronLeft, Shield, BookOpen } from 'lucide-react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Wallet, ArrowRight, ShieldCheck, CheckCircle2, Building, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { combinedCredits } from '../services/api';
-
-const CREDIT_PRICE = 520;
 
 export default function CarbonWallet() {
   const navigate = useNavigate();
-  const { user, farms } = useAuth();
+  const { user } = useAuth();
 
-  const { verifiedCredits, pendingCredits, initialBalance, farmActivities } = useMemo(() => {
-    let verified = 0, pending = 0;
-    const acts = farms.map((f, i) => {
-      const c = combinedCredits(f);
-      if (f.status === 'Verified' || !f.status) verified += c.total; else pending += c.total;
-      return {
-        id: `farm-${f.id || i}`,
-        title: `Satellite Verification — ${f.name || 'Farm'}`,
-        credits: c.total,
-        date: f.created_at ? new Date(f.created_at).toLocaleDateString() : 'Registered',
-        status: f.status || 'Verified',
-        meta: f.ndvi != null ? `NDVI ${f.ndvi}` : undefined,
-      };
-    });
-    return { verifiedCredits: verified, pendingCredits: pending, initialBalance: verified * CREDIT_PRICE, farmActivities: acts };
-  }, [farms]);
+  const [totalEarned, setTotalEarned] = useState(4250.0);
+  const [pendingEscrow, setPendingEscrow] = useState(1050.0);
+  const [withdrawableUpi, setWithdrawableUpi] = useState(3200.0);
 
-  const upiId = user?.upi || '';
-  const [balance, setBalance] = useState(initialBalance);
-  const [activities, setActivities] = useState(farmActivities);
-  const [showWithdraw, setShowWithdraw] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawing, setWithdrawing] = useState(false);
-  const [success, setSuccess] = useState(false);
+  // Bank Withdrawal Modal State
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [selectedBank, setSelectedBank] = useState('State Bank of India (SBI)');
+  const [upiIdInput, setUpiIdInput] = useState(user?.upi || 'ramesh@upi');
+  const [withdrawAmt, setWithdrawAmt] = useState('1000');
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferSuccess, setTransferSuccess] = useState(false);
 
-  useEffect(() => { setBalance(initialBalance); setActivities(farmActivities); }, [initialBalance, farmActivities]);
+  // Itemized transaction ledger dataset
+  const [transactions, setTransactions] = useState([
+    {
+      date: '2026-09-05',
+      txId: 'TXN-99812',
+      source: 'Corporate Direct (Deccan Energy)',
+      creditsSold: 10.0,
+      rate: 340,
+      gross: 3400.0,
+      fee2pct: 68.0,
+      netReceived: 3332.0,
+      status: 'SETTLED'
+    },
+    {
+      date: '2026-08-28',
+      txId: 'TXN-99704',
+      source: 'Cooperative Pool (Yaadadri FPC)',
+      creditsSold: 3.0,
+      rate: 300,
+      gross: 900.0,
+      fee2pct: 18.0,
+      netReceived: 882.0,
+      status: 'SETTLED'
+    }
+  ]);
 
-  const handleWithdraw = (e) => {
+  const handleWithdrawSubmit = (e) => {
     e.preventDefault();
-    const amt = parseFloat(withdrawAmount);
-    if (isNaN(amt) || amt <= 0 || amt > balance) return;
-    setWithdrawing(true);
+    const amt = parseFloat(withdrawAmt) || 0;
+    if (amt <= 0 || amt > withdrawableUpi) return;
+
+    setIsTransferring(true);
     setTimeout(() => {
-      setWithdrawing(false); setSuccess(true); setBalance(prev => prev - amt);
-      setActivities([{ id: `act-${Date.now()}`, title: 'UPI Payout', amount: -amt, date: 'Today', status: 'Completed' }, ...activities]);
-      setTimeout(() => { setSuccess(false); setShowWithdraw(false); setWithdrawAmount(''); }, 2000);
-    }, 2000);
+      setIsTransferring(false);
+      setTransferSuccess(true);
+      setWithdrawableUpi((prev) => prev - amt);
+      setTotalEarned((prev) => prev + amt);
+
+      const newTx = {
+        date: new Date().toISOString().split('T')[0],
+        txId: `TXN-${Math.floor(10000 + Math.random() * 90000)}`,
+        source: `Simulated UPI Transfer (${selectedBank})`,
+        creditsSold: (amt / 340).toFixed(2),
+        rate: 340,
+        gross: amt,
+        fee2pct: amt * 0.02,
+        netReceived: amt * 0.98,
+        status: 'SETTLED'
+      };
+
+      setTransactions([newTx, ...transactions]);
+
+      setTimeout(() => {
+        setTransferSuccess(false);
+        setShowWithdrawModal(false);
+      }, 1800);
+    }, 1200);
   };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
-        <button onClick={() => navigate('/dashboard')} className="flex items-center justify-center p-2 rounded-xl bg-white border border-forest-100 text-carbon-600 hover:text-forest-800">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h2 className="text-sm font-black tracking-wider uppercase text-carbon-800">Carbon Wallet</h2>
-        <div className="w-9 h-9" />
-      </div>
+    <div className="min-h-screen bg-surface font-inter text-agriText-main py-8 px-4 md:px-10">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      {/* Ledger card */}
-      <div className="bg-forest-900 text-white rounded-2xl p-6 shadow-xl mb-6 relative overflow-hidden">
-        <div className="flex justify-between items-start mb-6">
+        {/* Header */}
+        <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <span className="text-[10px] text-forest-300 font-bold uppercase tracking-wider">Carbon Ledger</span>
-            <h3 className="text-2xl font-black text-white mt-1">₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
-            <p className="text-[10px] text-white/60 mt-1">Token Balance Value</p>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-surface-sage border border-forest-200 px-2.5 py-0.5 rounded-full">
+                Financial Summary Ledger
+              </span>
+              <span className="text-[10px] font-semibold text-agriText-subtle bg-warm-cream px-2 py-0.5 rounded">
+                Simulated UPI Rails
+              </span>
+            </div>
+            <h1 className="text-2xl font-extrabold text-carbon-900 font-manrope">Farmer Carbon Wallet</h1>
+            <p className="text-xs text-agriText-muted mt-0.5">Automated UPI settlements with transparent 2% platform fee breakdown.</p>
           </div>
-          <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-forest-300"><Shield className="w-5 h-5" /></div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 text-xs">
-          <div>
-            <p className="text-[9px] uppercase tracking-wider text-white/40">Verified Credits</p>
-            <p className="text-sm font-black text-white mt-0.5">{verifiedCredits.toFixed(1)} t</p>
-            <p className="text-[9px] text-forest-300 mt-0.5">₹{(verifiedCredits * CREDIT_PRICE).toLocaleString('en-IN')}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-wider text-white/40">Pending</p>
-            <p className="text-sm font-black text-white mt-0.5">{pendingCredits.toFixed(1)} t</p>
-            <p className="text-[9px] text-orange-400 mt-0.5">Est: ₹{(pendingCredits * CREDIT_PRICE).toLocaleString('en-IN')}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          <button onClick={() => setShowWithdraw(true)} disabled={balance <= 0}
-            className="py-3 px-4 rounded-xl bg-forest-500 text-white font-bold text-xs transition-all hover:scale-[1.02] disabled:opacity-40 disabled:scale-100 flex items-center justify-center gap-1.5">
-            <ArrowUpRight className="w-4 h-4" /><span>Withdraw UPI</span>
+
+          <button
+            onClick={() => navigate('/farmer/dashboard')}
+            className="px-4 py-2.5 bg-surface-sage hover:bg-forest-100 border border-forest-200 text-carbon-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Dashboard</span>
           </button>
-          <div className="py-3 px-4 rounded-xl bg-white/5 border border-white/15 text-white font-bold text-xs flex items-center justify-center gap-1.5">
-            <span>View Contract</span>
+        </div>
+
+        {/* Financial Summary Banner */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-surface-sage border border-forest-200 text-carbon-900 shadow-card rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <p className="text-[11px] font-semibold text-agriText-subtle uppercase tracking-wider">Total Lifetime Earned</p>
+              <p className="text-3xl font-extrabold font-manrope text-primary mt-2">
+                ₹{totalEarned.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <p className="text-[11px] text-agriText-muted mt-4">Settled into linked bank account via simulated UPI</p>
+          </div>
+
+          <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <p className="text-[11px] font-semibold text-agriText-subtle uppercase tracking-wider">Pending Escrow Balance</p>
+              <p className="text-3xl font-extrabold text-amber-700 font-manrope mt-2">
+                ₹{pendingEscrow.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <p className="text-xs text-agriText-muted mt-4">Held in smart escrow until corporate purchase execution</p>
+          </div>
+
+          <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <p className="text-[11px] font-semibold text-agriText-subtle uppercase tracking-wider">Settled Withdrawable Balance</p>
+              <p className="text-3xl font-extrabold text-carbon-900 font-manrope mt-2">
+                ₹{withdrawableUpi.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowWithdrawModal(true)}
+              className="mt-4 w-full py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+            >
+              <Wallet className="w-4 h-4" />
+              <span>Simulate Instant UPI Payout</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* UPI bar */}
-      <div className="bg-white rounded-2xl p-4 border border-forest-100 shadow-sm flex items-center justify-between text-xs mb-6">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 bg-forest-50 text-forest-700 rounded-lg"><CheckCircle className="w-4 h-4" /></div>
-          <div>
-            <p className="font-bold text-carbon-800">Linked UPI</p>
-            <p className="text-[10px] text-carbon-400 font-mono">{upiId || 'No UPI linked'}</p>
+        {/* Itemized Transaction Ledger */}
+        <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-base font-bold text-carbon-900">Itemized Transaction Ledger</h2>
+              <p className="text-xs text-agriText-muted">Transparent breakdown showing 2% CarbonX platform fee deduction.</p>
+            </div>
+
+            <span className="text-xs font-mono font-semibold text-primary bg-surface-sage border border-forest-200 px-3 py-1 rounded-full">
+              UPI VPA: {upiIdInput}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-forest-100 bg-surface-sage/40 text-agriText-muted font-semibold uppercase tracking-wider">
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Transaction ID</th>
+                  <th className="py-3 px-4">Source / Buyer</th>
+                  <th className="py-3 px-4">Credits Sold</th>
+                  <th className="py-3 px-4">Rate / Unit</th>
+                  <th className="py-3 px-4">2% Fee Deducted</th>
+                  <th className="py-3 px-4">Net Settled Amount</th>
+                  <th className="py-3 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-forest-50 font-medium">
+                {transactions.map((tx) => (
+                  <tr key={tx.txId} className="hover:bg-surface-sage/30 transition-colors">
+                    <td className="py-3 px-4 text-agriText-muted">{tx.date}</td>
+                    <td className="py-3 px-4 font-mono text-carbon-900">{tx.txId}</td>
+                    <td className="py-3 px-4 font-bold text-carbon-900">{tx.source}</td>
+                    <td className="py-3 px-4 text-carbon-800">{tx.creditsSold} MT</td>
+                    <td className="py-3 px-4 text-carbon-800">₹{tx.rate}</td>
+                    <td className="py-3 px-4 text-red-700 font-semibold">- ₹{tx.fee2pct.toFixed(2)}</td>
+                    <td className="py-3 px-4 font-extrabold text-primary">₹{tx.netReceived.toFixed(2)}</td>
+                    <td className="py-3 px-4">
+                      <span className="bg-surface-sage text-primary border border-forest-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold">
+                        {tx.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-        <span className="text-[9px] bg-forest-50 text-forest-700 font-bold px-2 py-0.5 rounded-full">VERIFIED</span>
-      </div>
 
-      {/* Transaction history */}
-      <div className="flex items-center justify-between mb-4 px-1">
-        <h4 className="text-xs font-bold text-carbon-600 uppercase tracking-wider">Transaction History</h4>
-        <span className="text-[10px] text-carbon-400 flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" /> Immutable Log</span>
-      </div>
-      <div className="bg-white rounded-2xl p-5 border border-forest-100 shadow-sm space-y-4">
-        {activities.length === 0 ? (
-          <p className="text-xs text-carbon-400 text-center py-4">No transactions yet. Register and verify a farm to start earning credits.</p>
-        ) : activities.map((act) => (
-          <div key={act.id} className="flex justify-between items-start text-xs border-b border-forest-50 pb-3.5 last:border-0 last:pb-0">
-            <div className="flex gap-3">
-              <div className={`p-2 rounded-xl h-9 w-9 flex items-center justify-center shrink-0 ${act.amount !== undefined && act.amount < 0 ? 'bg-orange-50 text-orange-600' : 'bg-forest-50 text-forest-700'}`}>
-                {act.amount !== undefined && act.amount < 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
-              </div>
-              <div>
-                <h5 className="font-bold text-carbon-800">{act.title}</h5>
-                <p className="text-[10px] text-carbon-400 mt-0.5">{act.date} {act.meta && `· ${act.meta}`}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              {act.amount !== undefined ? (
-                <p className={`font-black ${act.amount > 0 ? 'text-forest-700' : 'text-carbon-800'}`}>{act.amount > 0 ? '+' : ''}₹{Math.abs(act.amount).toLocaleString('en-IN')}</p>
-              ) : (
-                <p className="font-black text-forest-700">+{act.credits} tCO2e</p>
-              )}
-              <span className={`inline-block text-[8px] font-mono px-2 py-0.5 rounded-full font-bold mt-1 uppercase ${act.status === 'Completed' ? 'bg-forest-50 text-forest-700' : 'bg-orange-50 text-orange-600'}`}>{act.status}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Withdraw modal */}
-      {showWithdraw && (
-        <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowWithdraw(false)} />
-          <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 border-t border-forest-100 shadow-2xl z-50 text-carbon-800">
-            <div className="w-12 h-1 bg-forest-100 rounded-full mx-auto mb-6" />
-            <h3 className="text-lg font-bold mb-1">Instant UPI Cashout</h3>
-            <p className="text-xs text-carbon-500 mb-6">Funds will be deposited into your verified bank account via UPI.</p>
-            <form onSubmit={handleWithdraw} className="space-y-5">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-carbon-500 block mb-2">Withdrawal Amount (₹)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-lg text-carbon-400">₹</span>
-                  <input type="number" max={balance} min="1" required placeholder="Enter amount" value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full pl-8 pr-16 py-4 bg-forest-50 border border-forest-100 rounded-2xl font-black text-lg focus:outline-none focus:border-forest-600 focus:bg-white transition-all" />
-                  <button type="button" onClick={() => setWithdrawAmount(balance.toString())}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-forest-700 text-white rounded-lg text-[10px] font-bold uppercase">MAX</button>
+        {/* Instant UPI Withdrawal Modal */}
+        {showWithdrawModal && (
+          <div className="fixed inset-0 z-50 bg-carbon-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white border border-forest-100 shadow-2xl rounded-2xl p-6 max-w-md w-full space-y-4">
+              <div className="flex justify-between items-center border-b border-forest-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-primary" />
+                  <h3 className="text-sm font-bold text-carbon-900">Simulated UPI Bank Payout</h3>
                 </div>
-                <p className="text-[10px] text-carbon-400 mt-2 flex justify-between px-1">
-                  <span>Available: ₹{balance.toLocaleString('en-IN')}</span><span>Fee: ₹0</span>
-                </p>
+                <span className="text-[10px] font-bold text-agriText-subtle bg-warm-cream px-2 py-0.5 rounded">
+                  Demo Mode
+                </span>
               </div>
-              {success ? (
-                <div className="p-4 bg-forest-50 text-forest-700 rounded-2xl text-center font-bold text-xs border border-forest-200 flex items-center justify-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-forest-700" /><span>Payout Successful!</span>
+
+              {transferSuccess ? (
+                <div className="bg-surface-sage border border-forest-200 text-carbon-900 p-4 rounded-xl text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-primary mx-auto" />
+                  <p className="font-bold text-sm">Demo UPI Payout Dispatched!</p>
+                  <p className="text-xs text-agriText-muted">Simulated transfer completed to {selectedBank}.</p>
                 </div>
               ) : (
-                <button type="submit" disabled={withdrawing || !withdrawAmount || parseFloat(withdrawAmount) > balance}
-                  className="w-full py-4 rounded-2xl bg-forest-800 text-white font-bold shadow-lg hover:bg-forest-900 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-                  {withdrawing ? <><span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" /><span>Processing...</span></>
-                  : <><span>Confirm Transfer</span><ArrowUpRight className="w-4 h-4" /></>}
-                </button>
+                <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-carbon-800 mb-1">Destination Bank Account</label>
+                    <select
+                      value={selectedBank}
+                      onChange={e => setSelectedBank(e.target.value)}
+                      className="w-full px-3 py-2 bg-surface-sage/40 border border-forest-200 rounded-xl text-xs font-semibold text-carbon-900 focus:outline-none"
+                    >
+                      <option value="State Bank of India (SBI)">State Bank of India (SBI)</option>
+                      <option value="HDFC Bank">HDFC Bank</option>
+                      <option value="Telangana Grameena Bank">Telangana Grameena Bank</option>
+                      <option value="ICICI Bank">ICICI Bank</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-carbon-800 mb-1">UPI VPA Handle</label>
+                    <input
+                      type="text"
+                      required
+                      value={upiIdInput}
+                      onChange={e => setUpiIdInput(e.target.value)}
+                      className="w-full px-3 py-2 bg-surface-sage/40 border border-forest-200 rounded-xl text-xs font-mono text-carbon-900 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-carbon-800 mb-1">Withdrawal Amount (₹)</label>
+                    <input
+                      type="number"
+                      max={withdrawableUpi}
+                      min="100"
+                      required
+                      value={withdrawAmt}
+                      onChange={e => setWithdrawAmt(e.target.value)}
+                      className="w-full px-3 py-2 bg-surface-sage/40 border border-forest-200 rounded-xl text-sm font-bold text-carbon-900 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-agriText-subtle mt-1">Available balance: ₹{withdrawableUpi.toFixed(2)}</p>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowWithdrawModal(false)}
+                      className="flex-1 py-2.5 bg-surface-sage border border-forest-200 text-carbon-800 rounded-xl text-xs font-bold hover:bg-forest-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isTransferring}
+                      className="flex-1 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-hover flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>{isTransferring ? 'Processing...' : 'Confirm Demo Transfer'}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </form>
               )}
-            </form>
+            </div>
           </div>
-        </>
-      )}
+        )}
+
+      </div>
     </div>
   );
 }

@@ -1,117 +1,218 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Satellite, Cpu, TrendingUp, CheckCircle2, Loader2 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { useAuth } from '../context/AuthContext';
-import { farmsToAnalytics } from '../utils/farmAnalytics';
+import { useNavigate } from 'react-router-dom';
+import { Sparkles, Layers, ShieldCheck, ArrowRight, CheckCircle2, Building, Hash } from 'lucide-react';
+import BadgePill from '../components/BadgePill';
 
 export default function CorporateCreditAnalysis() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const { farms } = useAuth();
-  const analyticsFarms = farmsToAnalytics(farms);
-  const farm = analyticsFarms.find((f) => f.id === id) || analyticsFarms[0];
 
-  const [bidAmount, setBidAmount] = useState(530);
-  const [bidStatus, setBidStatus] = useState('idle');
+  // Bulk Auto-Match Engine State
+  const [targetVolume, setTargetVolume] = useState(100);
+  const [priority, setPriority] = useState('lowest_price'); // nearest, highest_ndvi, lowest_price
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [paymentDone, setPaymentDone] = useState(false);
 
-  if (!farm) {
-    return (
-      <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-        <div className="bg-white border border-dashed border-forest-200 rounded-2xl p-8 text-center text-sm text-carbon-500">
-          No farm data available. Browse the marketplace for live listings.
-          <button onClick={() => navigate('/marketplace')} className="block mx-auto mt-4 px-6 py-3 bg-forest-800 text-white rounded-2xl text-xs font-bold">Open Marketplace</button>
-        </div>
-      </div>
-    );
-  }
-
-  const priceTrendData = [
-    { week: 'W1', value: 480 }, { week: 'W2', value: 495 }, { week: 'W3', value: 510 },
-    { week: 'W4', value: 505 }, { week: 'W5', value: 520 },
+  // Greedy Fill Matched Parcels
+  const matchedParcels = [
+    { farm: 'Sri Venkateswara Organic Farm', farmer: 'Venkat Rao', survey: '124/A', credits: 78.0, rate: 340, badge: 'REGISTRY' },
+    { farm: 'Godavari Maize Plot', farmer: 'Venkat Rao', survey: '124/B', credits: 22.0, rate: 320, badge: 'REGISTRY_DOC' }
   ];
 
-  const handleBid = () => {
-    setBidStatus('processing');
-    setTimeout(() => setBidStatus('completed'), 2000);
+  const totalMatchedCredits = matchedParcels.reduce((acc, item) => acc + item.credits, 0);
+  const grossValue = matchedParcels.reduce((acc, item) => acc + item.credits * item.rate, 0);
+  const facilitationFee = grossValue * 0.02;
+  const netFarmerEscrow = grossValue - facilitationFee;
+
+  const handleExecutePayment = () => {
+    setPaymentDone(true);
+    setTimeout(() => {
+      setShowCheckoutModal(false);
+      setPaymentDone(false);
+      navigate('/buyer/certificates/CX-2026-CERT-00123');
+    }, 2000);
   };
 
-  const checks = [
-    { icon: ShieldCheck, label: 'Identity Verified', value: '99.4% Aadhaar match' },
-    { icon: Satellite, label: 'Satellite NDVI', value: farm.ndvi?.toFixed(2) || '0.52' },
-    { icon: Cpu, label: 'AI Confidence', value: farm.aiConfidence || '95%' },
-    { icon: TrendingUp, label: 'Carbon Potential', value: farm.carbonPot || '0 t CO2e/yr' },
-  ];
-
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/marketplace')} className="p-2 rounded-xl bg-white border border-forest-100 text-carbon-600 hover:text-forest-800">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-lg font-bold text-carbon-900">{farm.name}</h1>
-          <p className="text-[11px] text-carbon-500">{farm.cropType} · Credit Analysis</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-8 px-4 md:px-10">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        {checks.map((c, i) => {
-          const Icon = c.icon;
-          return (
-            <div key={i} className="bg-white border border-forest-100 rounded-2xl p-4 shadow-sm">
-              <Icon size={18} className="text-forest-600 mb-2" />
-              <p className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">{c.label}</p>
-              <p className="text-sm font-bold text-carbon-900 mt-0.5">{c.value}</p>
+        {/* Header */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex justify-between items-center">
+          <div>
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full inline-block mb-1">
+              Corporate Bulk Procurement & Checkout
+            </span>
+            <h1 className="text-2xl font-extrabold text-slate-900 font-manrope">Parcel Diligence & Auto-Match Engine</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Greedy fill allocation matching enterprise volume targets with verified Telangana parcels.</p>
+          </div>
+          <Sparkles className="w-10 h-10 text-emerald-700" />
+        </div>
+
+        {/* Bulk Procurement Matrix */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-6">
+          <h2 className="text-base font-bold text-slate-900">Bulk Auto-Match Configuration</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Target Volume Slider */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <label className="text-slate-700 uppercase tracking-wider">Target Offset Volume (MT CO2e)</label>
+                <span className="text-emerald-800 font-mono text-base">{targetVolume} MT</span>
+              </div>
+              <input
+                type="range"
+                min="50"
+                max="1000"
+                step="25"
+                value={targetVolume}
+                onChange={e => setTargetVolume(parseFloat(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-700"
+              />
+              <p className="text-[10px] text-slate-500">Range: 50 to 1,000 Metric Tonnes</p>
             </div>
-          );
-        })}
-      </div>
 
-      <div className="bg-white rounded-2xl border border-forest-100 shadow-sm p-5 mb-4">
-        <h3 className="text-xs font-bold text-carbon-800 mb-4">Carbon Credit Price Trend (₹/credit)</h3>
-        <div className="h-40 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={priceTrendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2C5E43" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#2C5E43" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="week" tickLine={false} axisLine={false} stroke="#94A3B8" style={{ fontSize: '9px' }} />
-              <YAxis tickLine={false} axisLine={false} stroke="#94A3B8" style={{ fontSize: '9px' }} />
-              <Tooltip contentStyle={{ backgroundColor: '#1E3127', border: 'none', borderRadius: '12px', color: '#FAF6F0', fontSize: '11px' }} />
-              <Area type="monotone" dataKey="value" stroke="#2C5E43" strokeWidth={2} fill="url(#priceGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
+            {/* Preference Priorities Selector */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Allocation Preference Priority
+              </label>
+              <select
+                value={priority}
+                onChange={e => setPriority(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none"
+              >
+                <option value="lowest_price">Lowest Unit Price (Greedy Cost Minimization)</option>
+                <option value="highest_ndvi">Highest Sentinel-2 NDVI Biomass Density</option>
+                <option value="nearest">Nearest Spatial Centroid (Telangana Mandals)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Matched Farm Parcels Summary Table */}
+          <div className="space-y-3 pt-4 border-t border-slate-100">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Real-Time Parcel Allocation Table</h3>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                    <th className="py-2.5 px-4">Matched Farm Parcel</th>
+                    <th className="py-2.5 px-4">Farmer</th>
+                    <th className="py-2.5 px-4">Survey</th>
+                    <th className="py-2.5 px-4">Badge</th>
+                    <th className="py-2.5 px-4">Allocated Volume</th>
+                    <th className="py-2.5 px-4">Unit Rate</th>
+                    <th className="py-2.5 px-4">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {matchedParcels.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-4 font-bold text-slate-900">{item.farm}</td>
+                      <td className="py-2.5 px-4 text-slate-700">{item.farmer}</td>
+                      <td className="py-2.5 px-4 font-mono text-slate-600">{item.survey}</td>
+                      <td className="py-2.5 px-4">
+                        <BadgePill badge={item.badge} size="sm" />
+                      </td>
+                      <td className="py-2.5 px-4 font-bold text-emerald-800">{item.credits} MT</td>
+                      <td className="py-2.5 px-4 text-slate-900">INR {item.rate}</td>
+                      <td className="py-2.5 px-4 font-extrabold text-slate-900">
+                        INR {(item.credits * item.rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="bg-forest-900 text-white rounded-2xl p-6 shadow-xl">
-        <h3 className="text-sm font-bold mb-4">Place a Bid</h3>
-        <div className="flex items-center gap-4 mb-4">
-          <div className="flex-1">
-            <label className="text-[10px] uppercase tracking-wider text-forest-300 font-bold block mb-2">Your Bid (₹/credit)</label>
-            <input type="number" min="100" step="10" value={bidAmount} onChange={e => setBidAmount(parseFloat(e.target.value) || 0)}
-              className="w-full p-3.5 bg-forest-800 border border-forest-700 rounded-xl text-lg font-black text-white focus:outline-none focus:border-forest-500" />
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-forest-300 font-bold">Total Value</p>
-            <p className="text-2xl font-black text-forest-300">₹{(bidAmount * (parseFloat(farm.carbonPot) || 24)).toLocaleString('en-IN')}</p>
-          </div>
-        </div>
+        {/* Escrow Financial Ledger Breakdown */}
+        <div className="bg-[#1B4332] text-white border border-emerald-900 shadow-sm rounded-xl p-6 space-y-4">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <Layers className="w-5 h-5 text-emerald-400" />
+            <span>Escrow Financial Ledger Breakdown</span>
+          </h2>
 
-        {bidStatus === 'completed' ? (
-          <div className="p-4 bg-forest-700 border border-forest-600 rounded-xl text-center text-sm font-bold flex items-center justify-center gap-2">
-            <CheckCircle2 size={20} /> Bid Placed Successfully!
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 border-t border-emerald-800/80">
+            <div>
+              <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Total Carbon Credit Value</p>
+              <p className="text-2xl font-extrabold font-manrope text-white mt-1">
+                INR {grossValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">2% CarbonX Facilitation Fee</p>
+              <p className="text-2xl font-extrabold font-manrope text-rose-300 mt-1">
+                INR {facilitationFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Automated Farmer Wallet Allocation</p>
+              <p className="text-2xl font-extrabold font-manrope text-emerald-400 mt-1">
+                INR {netFarmerEscrow.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
           </div>
-        ) : (
-          <button onClick={handleBid} disabled={bidStatus === 'processing'}
-            className="w-full py-3.5 bg-forest-500 hover:bg-forest-400 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-            {bidStatus === 'processing' ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : 'Submit Bid'}
+
+          <button
+            onClick={() => setShowCheckoutModal(true)}
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 mt-4"
+          >
+            <span>Proceed to Payment Gateway Simulation</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Payment Gateway Modal */}
+        {showCheckoutModal && (
+          <div className="fixed inset-0 z-50 bg-[#1B4332]/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 shadow-xl rounded-xl p-6 max-w-md w-full space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-emerald-700" />
+                  <h3 className="text-sm font-bold text-slate-900">Corporate Payment Gateway (UPI / RTGS)</h3>
+                </div>
+              </div>
+
+              {paymentDone ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-4 rounded-xl text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                  <p className="font-bold text-sm">Escrow Settlement Executed!</p>
+                  <p className="text-xs text-slate-600 font-mono">TX Hash: 0x7f9a883ce42b91028471abc882</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-xs">
+                    <p className="font-semibold text-slate-700">Gross Procurement Amount: <strong className="text-slate-900">INR {grossValue.toLocaleString()}</strong></p>
+                    <p className="text-[11px] text-slate-500">Includes 2% CarbonX facilitation fee split.</p>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCheckoutModal(false)}
+                      className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExecutePayment}
+                      className="flex-1 py-2.5 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 flex items-center justify-center gap-1"
+                    >
+                      <span>Simulate RTGS Payout</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
+
       </div>
     </div>
   );

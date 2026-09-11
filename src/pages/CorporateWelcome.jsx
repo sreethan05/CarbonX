@@ -1,54 +1,79 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Globe, ShieldCheck, TrendingUp, Leaf } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Globe, ShieldCheck, ArrowRight, Layers, Sparkles, Building2 } from 'lucide-react';
+import BadgePill from '../components/BadgePill';
 
 export default function CorporateWelcome() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      {/* Hero */}
-      <div className="bg-forest-900 text-white rounded-2xl p-8 mb-6 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-40 h-40 bg-forest-700/20 rounded-full blur-3xl" />
-        <div className="relative">
-          <span className="text-[10px] text-forest-300 font-bold uppercase tracking-wider">Corporate ESG Portal</span>
-          <h1 className="text-2xl font-black mt-2">Welcome, {user?.name || 'Corporate Buyer'}</h1>
-          <p className="text-xs text-white/60 mt-2 leading-relaxed max-w-md">
-            Purchase verified carbon credits from Indian farmers. Audit BRSR reports. Fund sustainable agroforestry. All backed by satellite verification.
-          </p>
-          <button onClick={() => navigate('/marketplace')}
-            className="mt-6 px-6 py-3 bg-forest-500 hover:bg-forest-400 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all">
-            Browse Marketplace <ArrowRight size={14} />
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900 py-8 px-4 md:px-10">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      {/* Features */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {[
-          { icon: Globe, title: 'Global ESG Compliance', desc: 'Meet BRSR and UN NetZero targets with verified carbon offsets.' },
-          { icon: ShieldCheck, title: 'Satellite Verified', desc: 'Every credit backed by Sentinel-2 NDVI data and blockchain ledger.' },
-          { icon: TrendingUp, title: 'Transparent Pricing', desc: 'Direct farmer-to-buyer marketplace. No middlemen. Fair prices.' },
-        ].map((f, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-forest-100 shadow-sm p-5">
-            <div className="w-10 h-10 bg-forest-50 text-forest-700 rounded-xl flex items-center justify-center mb-3"><f.icon size={20} /></div>
-            <h3 className="text-sm font-bold text-carbon-900">{f.title}</h3>
-            <p className="text-[11px] text-carbon-500 mt-1 leading-relaxed">{f.desc}</p>
+        {/* Hero */}
+        <div className="bg-[#1B4332] text-white border border-emerald-900 shadow-sm rounded-xl p-8 relative overflow-hidden">
+          <div className="max-w-3xl relative z-10 space-y-4">
+            <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider bg-emerald-950 border border-emerald-700 px-3 py-1 rounded-full">
+              Enterprise Buyer Portal Gateway
+            </span>
+            <h1 className="text-3xl md:text-4xl font-extrabold font-manrope text-white">
+              High-Integrity Agricultural Carbon Offsets
+            </h1>
+            <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
+              Procure verified carbon credits directly from Indian farmers. Built for BRSR reporting, Scope 1-3 neutrality compliance, and satellite-verified MRV auditability.
+            </p>
+
+            <div className="flex flex-wrap gap-4 pt-2">
+              <button
+                onClick={() => navigate('/marketplace')}
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
+              >
+                <span>Explore Trading Marketplace</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => navigate('/marketplace/checkout')}
+                className="px-6 py-3 bg-[#2D6A4F] hover:bg-[#40916C] text-[#D1FAE5] border border-emerald-500 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-300" />
+                <span>Run Bulk Auto-Match Engine</span>
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* CTA */}
-      <div className="bg-forest-50 border border-forest-100 rounded-2xl p-6 text-center">
-        <Leaf className="w-10 h-10 text-forest-600 mx-auto mb-3" />
-        <h3 className="text-sm font-bold text-forest-900">Ready to offset your carbon footprint?</h3>
-        <p className="text-xs text-forest-700 mt-1 mb-4">Browse verified carbon credits from farmers across India.</p>
-        <button onClick={() => navigate('/marketplace')}
-          className="px-6 py-3 bg-forest-800 text-white rounded-xl text-xs font-bold hover:bg-forest-900 transition-colors">
-          Enter Marketplace
-        </button>
+        {/* Verification Badge Tiers Explanation */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-6">
+          <h2 className="text-lg font-bold text-slate-900">Institutional Verification Badge Hierarchy</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+              <BadgePill badge="REGISTRY" size="sm" />
+              <p className="text-xs font-bold text-slate-900 mt-2">Tier 1A: Cadastral Match</p>
+              <p className="text-[11px] text-slate-600">Locked registry boundary match. Trading benchmark: INR 340 / credit.</p>
+            </div>
+
+            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-2">
+              <BadgePill badge="REGISTRY_DOC" size="sm" />
+              <p className="text-xs font-bold text-slate-900 mt-2">Tier 1B: Pahani Record</p>
+              <p className="text-[11px] text-slate-600">Pahani deed with verified survey bounds. Benchmark: INR 320 / credit.</p>
+            </div>
+
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-2">
+              <BadgePill badge="DOCUMENT" size="sm" />
+              <p className="text-xs font-bold text-slate-900 mt-2">Tier 2: OCR Validated</p>
+              <p className="text-[11px] text-slate-600">RoR 1B document with OCR validation. Benchmark: INR 310 / credit.</p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+              <BadgePill badge="FPO" size="sm" />
+              <p className="text-xs font-bold text-slate-900 mt-2">Tier 3: FPO Attestation</p>
+              <p className="text-[11px] text-slate-600">Attested by recognized FPO cooperative. Benchmark: INR 300 / credit.</p>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

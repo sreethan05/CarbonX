@@ -2,51 +2,60 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Compass, ShoppingCart, Wallet, Menu, Bell, Globe, X, LogOut,
-  ShieldCheck, ClipboardList, BarChart3,
+  ShieldCheck, ClipboardList, BarChart3, Sprout, Building2, ChevronLeft,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import FarmerVoiceAssistant from '../features/voice-agent/FarmerVoiceAssistant';
+import OfflineBanner from './OfflineBanner';
 
 const ROLE_NAV = {
   farmer: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
-    { name: 'KYC Verification', path: '/farm-verification', icon: ShieldCheck },
-    { name: 'Farm Analytics', path: '/farm-analytics', icon: Compass },
+    { name: 'Dashboard', path: '/farmer/dashboard', icon: Home },
+    { name: 'Land Verification', path: '/farmer/land-verification', icon: ShieldCheck },
+    { name: 'Carbon Passport', path: '/farmer/passport/TEL-124A', icon: Compass },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
-    { name: 'Carbon Wallet', path: '/wallet', icon: Wallet },
+    { name: 'Wallet & UPI Ledger', path: '/farmer/wallet', icon: Wallet },
+    { name: 'Support', path: '/support', icon: ClipboardList },
+  ],
+  fpo: [
+    { name: 'FPO Dashboard', path: '/fpo/dashboard', icon: Building2 },
+    { name: 'Credit Pooling', path: '/fpo/credit-pooling', icon: ShieldCheck },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   buyer: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'ESG Dashboard', path: '/corporate/dashboard', icon: Home },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
-    { name: 'Credit Analysis', path: '/farm-analytics', icon: BarChart3 },
-    { name: 'Wallet', path: '/wallet', icon: Wallet },
+    { name: 'Bulk Auto-Match', path: '/marketplace/checkout', icon: BarChart3 },
+    { name: 'Certificates', path: '/buyer/certificates/CX-2026-CERT-00123', icon: ShieldCheck },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   verifier: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
-    { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
+    { name: 'FPO Audit Desk', path: '/fpo/dashboard', icon: Home },
+    { name: 'Admin Compliance', path: '/admin/dashboard', icon: ShieldCheck },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   admin: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
-    { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
+    { name: 'Admin Dashboard', path: '/admin/dashboard', icon: Home },
+    { name: 'FPO Desk', path: '/fpo/dashboard', icon: Building2 },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
 };
 
 const ROLE_META = {
-  farmer:  { label: 'Farmer',          classes: 'bg-forest-50 text-forest-700' },
-  buyer:   { label: 'Corporate Buyer',  classes: 'bg-sky-50 text-sky-700' },
-  verifier:{ label: 'Verifier',         classes: 'bg-amber-50 text-amber-700' },
-  admin:   { label: 'Admin',            classes: 'bg-rose-50 text-rose-700' },
+  farmer:   { label: 'Farmer',          classes: 'bg-emerald-50 text-emerald-800 border border-emerald-200' },
+  fpo:      { label: 'FPO Officer',     classes: 'bg-amber-50 text-amber-800 border border-amber-200' },
+  buyer:    { label: 'Corporate Buyer', classes: 'bg-sky-50 text-sky-800 border border-sky-200' },
+  verifier: { label: 'Verifier',        classes: 'bg-amber-50 text-amber-800 border border-amber-200' },
+  admin:    { label: 'Admin Audit',     classes: 'bg-rose-50 text-rose-800 border border-rose-200' },
 };
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { changeLanguage, currentLang } = useLanguage();
+  const { t, changeLanguage, currentLang } = useLanguage();
   const { user, logout, role, isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -73,10 +82,7 @@ export default function Layout({ children }) {
 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
-  const goTo = (path) => {
-    navigate(path);
-    setSidebarOpen(false);
-  };
+  const goTo = (path) => { navigate(path); setSidebarOpen(false); };
   const handleLogout = () => { logout(); navigate('/farmer-login'); };
 
   const renderNavItems = () => navItems.map((item) => {
@@ -186,6 +192,8 @@ export default function Layout({ children }) {
         </div>
       </header>
 
+      <OfflineBanner />
+
       {showNotifications && isAuthenticated && (
         <div className="fixed top-14 right-4 z-40 bg-white border border-forest-100 rounded-2xl shadow-xl p-4 w-80 max-h-96 overflow-y-auto">
           <div className="flex justify-between items-center mb-3">
@@ -235,8 +243,6 @@ export default function Layout({ children }) {
         </main>
       </div>
 
-      {isAuthenticated && role === 'farmer' && <FarmerVoiceAssistant />}
-
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-forest-100/50 py-2.5 px-4 flex justify-around items-center md:hidden shadow-lg">
         {navItems.slice(0, 5).map((item) => {
           const active = isActive(item.path);
@@ -244,7 +250,7 @@ export default function Layout({ children }) {
           return (
             <button
               key={item.path}
-              onClick={() => goTo(item.path)}
+              onClick={() => navigate(item.path)}
               className="flex flex-col items-center justify-center gap-1 transition-all duration-200 flex-1"
             >
               <div className={active ? 'px-4 py-1.5 bg-forest-100 rounded-full flex items-center justify-center shadow-sm' : 'px-4 py-1.5 text-carbon-400'}>
