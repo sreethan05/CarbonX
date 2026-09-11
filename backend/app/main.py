@@ -9,7 +9,7 @@ ROOT_DIR = BACKEND_DIR.parent
 load_dotenv(ROOT_DIR / ".env", override=True)
 load_dotenv(BACKEND_DIR / ".env", override=True)
 
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -19,6 +19,7 @@ import os
 from app.security import create_access_token, decode_token
 from app.phone_service import generate_otp, send_phone_otp
 from app import supabase_db as db
+from app import sample_data
 from app.services.kyc_service import analyse_document, validate_aadhaar
 
 app = FastAPI(title="CarbonX API")
@@ -591,14 +592,77 @@ def save_farm(data: SaveFarmModel, current_user: dict = Depends(get_current_user
 
 
 @app.get("/marketplace/listings")
-def marketplace_listings():
+def marketplace_listings(
+    status: Optional[str] = Query(
+        "Active",
+        description="Filter by listing status. Use 'all' to return every status (Active, Sold, Expired, ...).",
+    ),
+    crop: Optional[str] = Query(None, description="Partial, case-insensitive match on crop, e.g. ?crop=rice"),
+    location: Optional[str] = Query(None, description="Partial, case-insensitive match on location, e.g. ?location=khammam"),
+    farmer_phone: Optional[str] = Query(None, description="Exact farmer phone, e.g. ?farmer_phone=9876543210"),
+    farm_id: Optional[str] = Query(None, description="Exact farm UUID"),
+    listing_model: Optional[str] = Query(None, description="Partial match on listing model, e.g. ?listing_model=fixed"),
+    min_price: Optional[float] = Query(None, description="Minimum price_per_credit (inclusive)"),
+    max_price: Optional[float] = Query(None, description="Maximum price_per_credit (inclusive)"),
+    min_credits: Optional[float] = Query(None, description="Minimum total_credits (inclusive)"),
+    max_credits: Optional[float] = Query(None, description="Maximum total_credits (inclusive)"),
+    search: Optional[str] = Query(None, description="Free-text search across farmer_name, crop and location"),
+    sort: str = Query(
+        "created_at",
+        description=f"Sort column. One of: {', '.join(sorted(db.LISTING_SORT_COLUMNS))}",
+    ),
+    order: str = Query("desc", pattern="^(asc|desc)$", description="Sort direction: asc or desc"),
+    limit: int = Query(50, ge=1, le=200, description="Page size (max 200)"),
+    offset: int = Query(0, ge=0, description="Page offset for pagination"),
+):
     try:
-        _require_database()
-        return {"success": True, "listings": db.get_listings()}
-    except HTTPException:
-        raise
+        query_kwargs = {
+            "status": status,
+            "crop": crop,
+            "location": location,
+            "farmer_phone": farmer_phone,
+            "farm_id": farm_id,
+            "listing_model": listing_model,
+            "min_price": min_price,
+            "max_price": max_price,
+            "min_credits": min_credits,
+            "max_credits": max_credits,
+            "search": search,
+            "sort": sort,
+            "order": order,
+            "limit": limit,
+            "offset": offset,
+        }
+        applied = {k: v for k, v in query_kwargs.items() if v is not None}
+
+        result = None
+        source = "live_db"
+        if db.is_ready():
+            try:
+                result = db.get_listings_filtered(**query_kwargs)
+            except Exception as e:
+                print(f"[marketplace/listings] LIVE DB query failed ({e}) — serving FALLBACK sample data")
+                result = None
+        else:
+            print("[marketplace/listings] LIVE DB not configured — serving FALLBACK sample data")
+        if result is None:
+            source = "fallback"
+            result = sample_data.filter_listings(sample_data.FALLBACK_LISTINGS, **query_kwargs)
+
+        print(
+            f"[marketplace/listings] source={'LIVE DB' if source == 'live_db' else 'FALLBACK sample data'} "
+            f"| matched={result['total']} | returned={len(result['listings'])} | filters={applied or 'default'}"
+        )
+        return {
+            "success": True,
+            "source": source,
+            "total": result["total"],
+            "count": len(result["listings"]),
+            "filters": applied,
+            "listings": result["listings"],
+        }
     except Exception as e:
-        return {"success": False, "message": str(e), "listings": []}
+        return {"success": False, "message": str(e), "source": "error", "total": 0, "count": 0, "listings": []}
 
 
 @app.post("/marketplace/listings")
@@ -628,8 +692,7 @@ def create_listing(data: CreateListingModel, current_user: dict = Depends(get_cu
             "biodiversity_credits": b_credits,
             "total_credits": total,
             "price_per_credit": data.price_per_credit,
-            "current_bid": data.price_per_credit * total,
-            "bids_count": 0,
+            "listing_model": "Fixed Price",
             "status": "Active",
             "farm_id": data.farm_id,
             "token_id": data.token_id,
@@ -644,16 +707,6 @@ def create_listing(data: CreateListingModel, current_user: dict = Depends(get_cu
         return {"success": True, "listing": saved}
     except HTTPException:
         raise
-    except Exception as e:
-        return {"success": False, "message": str(e)}
-
-
-@app.post("/marketplace/listings/{listing_id}/bid")
-def place_bid(listing_id: str, current_user: dict = Depends(get_current_user)):
-    try:
-        _require_database()
-        db.increment_listing_bids(listing_id)
-        return {"success": True, "message": "Bid recorded"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 

@@ -202,6 +202,76 @@ def get_listings(status: Optional[str] = "Active") -> list:
     return res.data or []
 
 
+LISTING_SORT_COLUMNS = {
+    "created_at",
+    "updated_at",
+    "price_per_credit",
+    "total_credits",
+    "carbon_credits",
+    "biodiversity_credits",
+    "expires_at",
+}
+
+
+def get_listings_filtered(
+    status: Optional[str] = "Active",
+    crop: Optional[str] = None,
+    location: Optional[str] = None,
+    farmer_phone: Optional[str] = None,
+    farm_id: Optional[str] = None,
+    listing_model: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    min_credits: Optional[float] = None,
+    max_credits: Optional[float] = None,
+    search: Optional[str] = None,
+    sort: str = "created_at",
+    order: str = "desc",
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    sb = _client()
+    if not sb:
+        return {"total": 0, "listings": []}
+
+    q = sb.table("marketplace_listings").select("*", count="exact")
+
+    if status and status.strip().lower() != "all":
+        q = q.eq("status", status)
+    if crop:
+        q = q.ilike("crop", f"*{crop}*")
+    if location:
+        q = q.ilike("location", f"*{location}*")
+    if farmer_phone:
+        q = q.eq("farmer_phone", farmer_phone)
+    if farm_id:
+        q = q.eq("farm_id", farm_id)
+    if listing_model:
+        q = q.ilike("listing_model", f"*{listing_model}*")
+    if min_price is not None:
+        q = q.gte("price_per_credit", min_price)
+    if max_price is not None:
+        q = q.lte("price_per_credit", max_price)
+    if min_credits is not None:
+        q = q.gte("total_credits", min_credits)
+    if max_credits is not None:
+        q = q.lte("total_credits", max_credits)
+    if search:
+        clean = "".join(ch for ch in search if ch not in ",()*")
+        if clean:
+            pattern = f"*{clean}*"
+            q = q.or_(
+                f"farmer_name.ilike.{pattern},crop.ilike.{pattern},location.ilike.{pattern}"
+            )
+
+    sort_col = sort if sort in LISTING_SORT_COLUMNS else "created_at"
+    descending = str(order).lower() != "asc"
+    limit = max(1, limit)
+    res = q.order(sort_col, desc=descending).range(offset, offset + limit - 1).execute()
+
+    return {"total": res.count, "listings": res.data or []}
+
+
 def insert_listing(listing: dict) -> Optional[dict]:
     sb = _client()
     if not sb:
@@ -209,19 +279,6 @@ def insert_listing(listing: dict) -> Optional[dict]:
     res = sb.table("marketplace_listings").insert(listing).execute()
     rows = res.data or []
     return rows[0] if rows else listing
-
-
-def increment_listing_bids(listing_id: str) -> bool:
-    sb = _client()
-    if not sb:
-        return False
-    res = sb.table("marketplace_listings").select("bids_count").eq("id", listing_id).limit(1).execute()
-    rows = res.data or []
-    if not rows:
-        return False
-    count = (rows[0].get("bids_count") or 0) + 1
-    sb.table("marketplace_listings").update({"bids_count": count}).eq("id", listing_id).execute()
-    return True
 
 
 def compute_credits(carbon_tonnes: float, biodiversity_score: float) -> dict:
