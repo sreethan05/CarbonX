@@ -1,96 +1,29 @@
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Node
+# Dependencies
 node_modules/
-dist/
+backend/.venv/
+venv/
+.venv/
 
-# Secrets & Environment variables
+# Environment files and secrets
 .env
 .env.*
-*.env
+!.env.example
+!.env.*.example
 **/.env
 **/.env.*
-!.env.example
 !**/.env.example
+!**/.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*credentials*.json
+*service-account*.json
+secrets/
 
-
-# Large model files
-artifacts/
-/data/
-mlruns/
-
-# Python
-__pycache__/
-*.pyc
-venv/
-*.egg-info/
-
-# Colab checkpoints
-.ipynb_checkpoints/
-dist/
-dist-ssr/
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea/
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Secrets
-.env
-
-# Large model files
-artifacts/
-/data/
-mlruns/
-
-# Python
-__pycache__/
-*.pyc
-venv/
-*.egg-info/
-
-# Colab checkpoints
-.ipynb_checkpoints/
-git status
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-# Logs
+# Logs and runtime files
 logs/
 *.log
 npm-debug.log*
@@ -98,80 +31,49 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.pid
+*.pid.lock
 
-# Node
-node_modules/
-dist/
-
-# Secrets
-.env
-
-# Large model files
-artifacts/
-/data/
-mlruns/
-
-# Python
-__pycache__/
-*.pyc
-venv/
-*.egg-info/
-
-# Colab checkpoints
-.ipynb_checkpoints/
+# Frontend and backend build output
 dist/
 dist-ssr/
-*.local
+build/
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
 
-# Editor directories and files
+# Python generated files
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.so
+
+# Generated data and model artifacts
+artifacts/
+data/
+mlruns/
+uploads/
+tmp/
+temp/
+.ipynb_checkpoints/
+
+# Local blockchain and deployment artifacts
+blockchain/cache/
+blockchain/artifacts/
+blockchain/typechain-types/
+blockchain/.openzeppelin/
+
+# IDE and operating-system files
 .vscode/*
 !.vscode/extensions.json
 .idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# Secrets
-.env
-
-# Large model files
-artifacts/
-/data/
-mlruns/
-
-# Python
-__pycache__/
-*.pyc
-venv/
-*.egg-info/
-
-# Colab checkpoints
-.ipynb_checkpoints/
-git status
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
 *.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?

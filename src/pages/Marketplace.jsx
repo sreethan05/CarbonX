@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Leaf, Loader2, CheckCircle2, MapPin } from 'lucide-react';
+import { Search, Loader2, MapPin, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getMarketplaceListings, placeListingBid, combinedCredits } from '../services/api';
+import { getMarketplaceListings, combinedCredits } from '../services/api';
 
 function formatListing(row) {
   const c = combinedCredits({ carbon_tonnes: row.carbon_credits, biodiversity_credits: row.biodiversity_credits, total_credits: row.total_credits });
@@ -17,8 +17,7 @@ export default function Marketplace() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [bidding, setBidding] = useState(null);
-  const [bidSuccess, setBidSuccess] = useState(null);
+  const [quantities, setQuantities] = useState({});
 
   useEffect(() => {
     getMarketplaceListings().then(res => {
@@ -31,17 +30,11 @@ export default function Marketplace() {
     !search || l.crop.toLowerCase().includes(search.toLowerCase()) || l.location.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleBid = async (id) => {
-    setBidding(id);
-    try {
-      const res = await placeListingBid(id);
-      if (res.success) {
-        setBidSuccess(id);
-        setListings(prev => prev.map(l => l.id === id ? { ...l, bids: l.bids + 1 } : l));
-        setTimeout(() => setBidSuccess(null), 3000);
-      }
-    } catch {}
-    setBidding(null);
+  const handleQuantityChange = (id, change) => {
+    setQuantities(prev => ({
+      ...prev,
+      [id]: Math.max(1, (prev[id] || 1) + change)
+    }));
   };
 
   return (
@@ -62,44 +55,59 @@ export default function Marketplace() {
           No listings available yet. {role === 'farmer' && 'Create a listing from your dashboard to sell credits.'}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 p-2">
           {filtered.map((l) => (
-            <div key={l.id} className="bg-white rounded-2xl border border-forest-100 shadow-sm p-4 hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-carbon-900">{l.crop}</h3>
-                  {l.location && <p className="text-[10px] text-carbon-400 flex items-center gap-1 mt-0.5"><MapPin size={10} /> {l.location}</p>}
+            <div key={l.id} className="border-b border-gray-100 py-6 px-4 last:border-0 hover:bg-gray-50/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex-1">
+                {/* Title */}
+                <h3 className="text-lg font-bold text-gray-900 mb-0.5">{l.crop}</h3>
+                
+                {/* Subtitle / Farmer Name */}
+                <p className="text-[15px] text-gray-600 mb-2">{l.farmer}</p>
+                
+                {/* Location / Date */}
+                <div className="flex items-center gap-4 text-[13px] text-gray-500 mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin size={14} className="text-gray-400" />
+                    <span>{l.location || 'Unknown Location'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={14} className="text-gray-400" />
+                    <span>Available: {l.total}</span>
+                  </div>
                 </div>
-                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${l.status === 'Active' ? 'bg-forest-50 text-forest-700' : 'bg-orange-50 text-orange-600'}`}>{l.status}</span>
+
+                {/* Tags row */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
+                    Carbon: {l.carbon}
+                  </span>
+                  <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
+                    Bio: {l.biodiversity}
+                  </span>
+                  <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
+                    ₹{l.price}/credit
+                  </span>
+                  {l.status && (
+                    <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
+                      {l.status}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                <div className="bg-forest-50/50 rounded-xl p-2">
-                  <p className="text-[8px] uppercase text-carbon-400 font-bold">Carbon</p>
-                  <p className="text-sm font-black text-amber-800">{l.carbon}</p>
-                </div>
-                <div className="bg-forest-50/50 rounded-xl p-2">
-                  <p className="text-[8px] uppercase text-carbon-400 font-bold">Bio</p>
-                  <p className="text-sm font-black text-forest-700">{l.biodiversity}</p>
-                </div>
-                <div className="bg-forest-50/50 rounded-xl p-2">
-                  <p className="text-[8px] uppercase text-carbon-400 font-bold">Total</p>
-                  <p className="text-sm font-black text-forest-900">{l.total}</p>
-                </div>
-              </div>
-              <div className="flex justify-between items-center pt-3 border-t border-forest-50">
-                <div>
-                  <p className="text-lg font-black text-forest-800">₹{l.price}<span className="text-[10px] font-normal text-carbon-400">/credit</span></p>
-                  <p className="text-[10px] text-carbon-400">{l.bids} bid{l.bids !== 1 ? 's' : ''}</p>
-                </div>
-                {bidSuccess === l.id ? (
-                  <div className="flex items-center gap-1 text-xs font-bold text-forest-700"><CheckCircle2 size={16} /> Bid Placed!</div>
-                ) : (
-                  <button onClick={() => handleBid(l.id)} disabled={bidding === l.id}
-                    className="px-4 py-2.5 bg-forest-800 text-white rounded-xl text-xs font-bold hover:bg-forest-900 transition-colors disabled:opacity-60 flex items-center gap-1.5">
-                    {bidding === l.id ? <Loader2 size={14} className="animate-spin" /> : <Leaf size={14} />}
-                    {role === 'buyer' ? 'Place Bid' : 'View'}
-                  </button>
-                )}
+
+              {/* Right side action area */}
+              <div className="flex items-center gap-3 md:pl-6">
+                 <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
+                   <button onClick={() => handleQuantityChange(l.id, -1)} className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 font-medium transition-colors">-</button>
+                   <span className="px-3 text-sm font-semibold w-10 text-center border-x border-gray-300">{quantities[l.id] || 1}</span>
+                   <button onClick={() => handleQuantityChange(l.id, 1)} className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 font-medium transition-colors">+</button>
+                 </div>
+                 <button 
+                   onClick={() => alert(`Buying ${quantities[l.id] || 1} credits!`)}
+                   className="text-[15px] font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 transition-colors">
+                   Buy {'>'}
+                 </button>
               </div>
             </div>
           ))}

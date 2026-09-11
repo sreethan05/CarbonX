@@ -109,8 +109,14 @@ export async function predictBiodiversity(longitude, latitude) {
 
 // ── Marketplace ──
 
-export async function getMarketplaceListings() {
-  return get(`${PY}/marketplace/listings`);
+// params: { status, crop, location, farmer_phone, farm_id, listing_model,
+//           min_price, max_price, min_credits, max_credits, search,
+//           sort, order, limit, offset }  (empty/null/undefined values are dropped)
+export async function getMarketplaceListings(params = {}) {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  ).toString();
+  return get(`${PY}/marketplace/listings${qs ? `?${qs}` : ''}`);
 }
 
 export async function createMarketplaceListing(payload) {
