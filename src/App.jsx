@@ -18,17 +18,21 @@ import VerificationSuccess from './pages/VerificationSuccess';
 import FarmerDashboard from './pages/FarmerDashboard';
 import DetailedFarmAnalytics from './pages/DetailedFarmAnalytics';
 import CarbonWallet from './pages/CarbonWallet';
-import Marketplace from './pages/Marketplace';
+import FPODashboard from './pages/FPODashboard';
+import FPOLogin from './pages/FPOLogin';
+import AdminDashboard from './pages/AdminDashboard';
 import CorporateWelcome from './pages/CorporateWelcome';
+import CorporateLogin from './pages/CorporateLogin';
+import CorporateDashboard from './pages/CorporateDashboard';
+import Marketplace from './pages/Marketplace';
 import CreateListing from './pages/CreateListing';
 import CorporateCreditAnalysis from './pages/CorporateCreditAnalysis';
-import CorporateDashboard from './pages/CorporateDashboard';
-import AdminDashboard from './pages/AdminDashboard';
+import CertificateRetirementPage from './pages/CertificateRetirementPage';
 import SupportCenter from './pages/SupportCenter';
 
 function ProtectedRoute({ children, roles }) {
   const { isAuthenticated, role } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/farmer-login" replace />;
+  if (!isAuthenticated) return <Navigate to="/farmer/login" replace />;
   if (roles && !roles.includes(role)) return <Navigate to="/dashboard" replace />;
   return children;
 }
@@ -38,8 +42,9 @@ function DashboardRouter() {
   switch (role) {
     case 'buyer':
       return <CorporateDashboard />;
+    case 'fpo':
     case 'verifier':
-      return <AdminDashboard />;
+      return <FPODashboard />;
     case 'admin':
       return <AdminDashboard />;
     default:
@@ -54,34 +59,60 @@ export default function App() {
         <Router>
           <Layout>
             <Routes>
-              {/* Public routes */}
+              {/* Public Gateway & Role Routes */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/role-selection" element={<RoleSelection />} />
+
+              {/* Farmer Auth & Onboarding Routes */}
+              <Route path="/farmer/register" element={<FarmerRegister />} />
               <Route path="/farmer-register" element={<FarmerRegister />} />
+              <Route path="/farmer/login" element={<FarmerLogin />} />
               <Route path="/farmer-login" element={<FarmerLogin />} />
+              <Route path="/onboarding" element={<WelcomeTutorial />} />
+              <Route path="/welcome-tutorial" element={<WelcomeTutorial />} />
 
-              {/* Farmer flow */}
-              <Route path="/onboarding" element={<ProtectedRoute><WelcomeTutorial /></ProtectedRoute>} />
-              <Route path="/farm-map" element={<ProtectedRoute><FarmMapRegistration /></ProtectedRoute>} />
-              <Route path="/farm-details" element={<ProtectedRoute><FarmDetailsForm /></ProtectedRoute>} />
-              <Route path="/satellite-preview" element={<ProtectedRoute><SatellitePreview /></ProtectedRoute>} />
-              <Route path="/submission-success" element={<ProtectedRoute><SuccessScreen /></ProtectedRoute>} />
-              <Route path="/farm-verification" element={<ProtectedRoute><FarmOwnershipVerification /></ProtectedRoute>} />
-               <Route path="/verification-success" element={<ProtectedRoute><VerificationSuccess /></ProtectedRoute>} />
+              {/* FPO & Corporate Login Routes */}
+              <Route path="/fpo/login" element={<FPOLogin />} />
+              <Route path="/fpo-login" element={<FPOLogin />} />
+              <Route path="/corporate/login" element={<CorporateLogin />} />
+              <Route path="/corporate-login" element={<CorporateLogin />} />
 
-              {/* Shared authenticated routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
-              <Route path="/farm-analytics" element={<ProtectedRoute><DetailedFarmAnalytics /></ProtectedRoute>} />
-              <Route path="/wallet" element={<ProtectedRoute><CarbonWallet /></ProtectedRoute>} />
-              <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
-              <Route path="/support" element={<ProtectedRoute><SupportCenter /></ProtectedRoute>} />
+              {/* Farmer Verification & Mapping Flow */}
+              <Route path="/farmer/land-verification" element={<FarmOwnershipVerification />} />
+              <Route path="/farm-verification" element={<FarmOwnershipVerification />} />
+              <Route path="/farm-map" element={<FarmMapRegistration />} />
+              <Route path="/farm-details" element={<FarmDetailsForm />} />
+              <Route path="/satellite-preview" element={<SatellitePreview />} />
+              <Route path="/verification-success" element={<VerificationSuccess />} />
+              <Route path="/submission-success" element={<SuccessScreen />} />
 
-              {/* Buyer routes */}
-              <Route path="/corporate-welcome" element={<ProtectedRoute roles={['buyer']}><CorporateWelcome /></ProtectedRoute>} />
-              <Route path="/credit-analysis/:id" element={<ProtectedRoute><CorporateCreditAnalysis /></ProtectedRoute>} />
+              {/* Farmer Dashboard & Analytics & Wallet */}
+              <Route path="/farmer/dashboard" element={<FarmerDashboard />} />
+              <Route path="/dashboard" element={<DashboardRouter />} />
+              <Route path="/farmer/passport/:farmId" element={<DetailedFarmAnalytics />} />
+              <Route path="/farm-analytics" element={<DetailedFarmAnalytics />} />
+              <Route path="/farmer/wallet" element={<CarbonWallet />} />
+              <Route path="/wallet" element={<CarbonWallet />} />
 
-              {/* Farmer-only routes */}
-              <Route path="/create-listing" element={<ProtectedRoute roles={['farmer']}><CreateListing /></ProtectedRoute>} />
+              {/* FPO Command Center & Pooling */}
+              <Route path="/fpo/dashboard" element={<FPODashboard />} />
+              <Route path="/fpo/credit-pooling" element={<FPODashboard />} />
+
+              {/* Admin Oversight */}
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+              {/* Corporate Buyer Portal & Marketplace */}
+              <Route path="/corporate/welcome" element={<CorporateWelcome />} />
+              <Route path="/corporate-welcome" element={<CorporateWelcome />} />
+              <Route path="/corporate/dashboard" element={<CorporateDashboard />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/create-listing" element={<CreateListing />} />
+              <Route path="/marketplace/checkout" element={<CorporateCreditAnalysis />} />
+              <Route path="/credit-analysis/:id" element={<CorporateCreditAnalysis />} />
+              <Route path="/buyer/certificates/:certId" element={<CertificateRetirementPage />} />
+
+              {/* Support */}
+              <Route path="/support" element={<SupportCenter />} />
 
               {/* Catch-all */}
               <Route path="*" element={<Navigate to="/" replace />} />

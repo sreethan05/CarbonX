@@ -1,93 +1,134 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { ArrowRight, Leaf, Sparkles, Sprout, Droplets, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { updateProfile } from '../services/api';
 
 export default function FarmDetailsForm() {
   const navigate = useNavigate();
-  const { t, currentLang } = useLanguage();
-  const { user, token, setUserProfile, farms } = useAuth();
-  const latestFarm = farms[0];
+  const { user } = useAuth();
 
-  const [crop, setCrop] = useState(latestFarm?.crop_type || 'Mixed Crop');
-  const [irrigation, setIrrigation] = useState(latestFarm?.irrigation || 'Drip Irrigation');
-  const [soil, setSoil] = useState('Red Sandy Loam');
-  const [organic, setOrganic] = useState('Yes - Zero Chemical');
-  const [treeCount, setTreeCount] = useState(1240);
-  const [waterSource, setWaterSource] = useState('Borewell + Rainwater harvesting');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [crop, setCrop] = useState('Cotton');
+  const [irrigation, setIrrigation] = useState('Drip Irrigation');
+  const [tillage, setTillage] = useState('Zero-Till');
+  const [fertilizer, setFertilizer] = useState('Bio-Fertilizers & Compost');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!token) { navigate('/farmer-login'); return; }
-    setLoading(true);
-    setError('');
-    try {
-      const res = await updateProfile({ preferred_language: currentLang });
-      if (res.success && res.user) setUserProfile(res.user);
-      localStorage.setItem('carbonx_farm_details', JSON.stringify({ crop, irrigation, soil, organic, treeCount, waterSource }));
-      navigate('/satellite-preview');
-    } catch {
-      setError('Could not save. Check your connection.');
-    }
-    setLoading(false);
+  // Real-time estimated carbon bonus per practice
+  const getBonus = () => {
+    let bonus = 0;
+    if (tillage === 'Zero-Till') bonus += 0.50;
+    if (tillage === 'Reduced-Till') bonus += 0.25;
+    if (irrigation === 'Drip Irrigation') bonus += 0.35;
+    if (fertilizer.includes('Bio-Fertilizers')) bonus += 0.40;
+    return bonus.toFixed(2);
   };
 
-  const crops = ['Paddy (Rice)', 'Cotton', 'Maize', 'Groundnut', 'Teak', 'Mango', 'Mixed Crop'];
-  const irrigations = ['Drip Irrigation', 'Flood Irrigation', 'Sprinkler', 'Rainfed'];
-  const soils = ['Red Sandy Loam', 'Black Cotton Soil', 'Alluvial', 'Laterite'];
-  const organics = ['Yes - Zero Chemical', 'Partial Organic', 'Conventional'];
-
-  const Select = ({ label, value, onChange, options }) => (
-    <div>
-      <label className="text-[10px] font-bold uppercase tracking-wider text-carbon-400 block mb-1.5">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3 bg-forest-50 border border-forest-100 rounded-xl text-sm font-semibold text-carbon-800 focus:outline-none focus:border-forest-600 focus:bg-white cursor-pointer">
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  );
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    localStorage.setItem('carbonx_farm_details', JSON.stringify({ crop, irrigation, tillage, fertilizer, bonus: getBonus() }));
+    navigate('/satellite-preview');
+  };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/farm-map')} className="p-2 rounded-xl bg-white border border-forest-100 text-carbon-600 hover:text-forest-800">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-lg font-bold text-carbon-900">Farm Details</h1>
-          <p className="text-[11px] text-carbon-500">Tell us about your farming practices</p>
+    <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-8 px-4 md:px-10">
+      <div className="max-w-2xl mx-auto space-y-6">
+
+        {/* Page Title */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex justify-between items-center">
+          <div>
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full inline-block mb-1">
+              Agronomic Metadata
+            </span>
+            <h1 className="text-2xl font-extrabold text-slate-900 font-manrope">Regenerative Farming Practices</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Capture soil management and irrigation practices to calculate yield bonus.</p>
+          </div>
+          <Sprout className="w-10 h-10 text-emerald-700" />
         </div>
+
+        {/* Real-Time Impact Preview Banner */}
+        <div className="bg-[#0D2F1D] text-white border border-emerald-800 shadow-sm rounded-xl p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-800/80 rounded-xl flex items-center justify-center text-emerald-300">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Sequestration Bonus Yield</p>
+              <p className="text-xl font-extrabold font-manrope text-white mt-0.5">
+                +{getBonus()} Credits / Acre / Year
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] bg-emerald-950 border border-emerald-600 text-emerald-300 px-3 py-1 rounded-full font-semibold">
+            LSTM Sequestration Boost
+          </span>
+        </div>
+
+        {/* Practices Form */}
+        <form onSubmit={handleSubmit} className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-5">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Primary Crop Type</label>
+            <select
+              value={crop}
+              onChange={e => setCrop(e.target.value)}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+            >
+              <option value="Cotton">Cotton</option>
+              <option value="Paddy (Rice)">Paddy (Rice)</option>
+              <option value="Pulses & Millets">Pulses & Millets</option>
+              <option value="Maize">Maize</option>
+              <option value="Sugarcane">Sugarcane</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Irrigation System</label>
+            <select
+              value={irrigation}
+              onChange={e => setIrrigation(e.target.value)}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+            >
+              <option value="Drip Irrigation">Drip Irrigation (+0.35 bonus)</option>
+              <option value="Sprinkler System">Sprinkler System (+0.20 bonus)</option>
+              <option value="Rain-fed">Rain-fed (+0.10 bonus)</option>
+              <option value="Canal Flood">Canal Flood (+0.00 bonus)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Tillage Management Practice</label>
+            <select
+              value={tillage}
+              onChange={e => setTillage(e.target.value)}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+            >
+              <option value="Zero-Till">Zero-Till / No-Till Farming (+0.50 bonus)</option>
+              <option value="Reduced-Till">Reduced Tillage (+0.25 bonus)</option>
+              <option value="Conventional">Conventional Deep Ploughing (+0.00 bonus)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Fertilizer & Nutrient Practices</label>
+            <select
+              value={fertilizer}
+              onChange={e => setFertilizer(e.target.value)}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+            >
+              <option value="Bio-Fertilizers & Compost">Bio-Fertilizers & Organic Compost (+0.40 bonus)</option>
+              <option value="Integrated Nutrient Mgmt">Integrated Nutrient Management (+0.20 bonus)</option>
+              <option value="Synthetic NPK">Synthetic Chemical NPK (+0.00 bonus)</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 mt-4"
+          >
+            <span>Proceed to Earth Engine Satellite Processing</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </form>
+
       </div>
-
-      {error && <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 mb-4 text-xs text-rose-700">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-forest-100 shadow-sm p-6 space-y-5">
-        <Select label="Crop Type" value={crop} onChange={setCrop} options={crops} />
-        <Select label="Irrigation Method" value={irrigation} onChange={setIrrigation} options={irrigations} />
-        <Select label="Soil Type" value={soil} onChange={setSoil} options={soils} />
-        <Select label="Organic Practice" value={organic} onChange={setOrganic} options={organics} />
-
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-carbon-400 block mb-1.5">Tree Count (on farm)</label>
-          <input type="number" min="0" value={treeCount} onChange={e => setTreeCount(parseInt(e.target.value) || 0)}
-            className="w-full p-3 bg-forest-50 border border-forest-100 rounded-xl text-sm font-semibold text-carbon-800 focus:outline-none focus:border-forest-600 focus:bg-white" />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-carbon-400 block mb-1.5">Water Source</label>
-          <input type="text" value={waterSource} onChange={e => setWaterSource(e.target.value)}
-            className="w-full p-3 bg-forest-50 border border-forest-100 rounded-xl text-sm font-semibold text-carbon-800 focus:outline-none focus:border-forest-600 focus:bg-white" />
-        </div>
-
-        <button type="submit" disabled={loading}
-          className="w-full py-3.5 bg-forest-800 text-white rounded-2xl text-sm font-bold hover:bg-forest-900 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <><span>Continue to Satellite Scan</span><ArrowRight size={14} /></>}
-        </button>
-      </form>
     </div>
   );
 }

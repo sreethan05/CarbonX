@@ -1,78 +1,101 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Satellite, Cpu, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Satellite, CheckCircle2, Lock, Sparkles, Activity, Layers, Sprout } from 'lucide-react';
 
 export default function SatellitePreview() {
   const navigate = useNavigate();
-  const [logIndex, setLogIndex] = useState(0);
-  const [analysis, setAnalysis] = useState(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('carbonx_last_analysis');
-      if (saved) setAnalysis(JSON.parse(saved));
-    } catch {}
-  }, []);
-
-  const logs = [
-    'Locking Sentinel-2 & Landsat-8 orbits...',
-    'Pulling multi-spectral raster bands...',
-    `Computing NDVI index${analysis ? `: ${analysis.ndvi}` : '...'}`,
-    `Verifying tree-canopy volume: ${analysis ? `${analysis.tree_cover || 68}% cover` : 'calculating...'}`,
-    `Calculating net biomass: ${analysis ? `${analysis.carbon_tonnes}t CO2e` : 'processing...'}`,
-    `Biodiversity score: ${analysis ? `${analysis.biodiversity_score}/100` : 'scoring...'}`,
-    'Generating blockchain ledger hash for verification...',
-  ];
+  const [progress, setProgress] = useState(0);
+  const [mrvLocked, setMrvLocked] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLogIndex((prev) => {
-        if (prev < logs.length - 1) return prev + 1;
-        clearInterval(interval);
-        setTimeout(() => navigate('/submission-success'), 1200);
-        return prev;
+      setProgress((prev) => {
+        if (prev < 100) {
+          return prev + 20;
+        } else {
+          clearInterval(interval);
+          setMrvLocked(true);
+          setTimeout(() => navigate('/verification-success'), 1800);
+          return 100;
+        }
       });
-    }, 1000);
+    }, 600);
     return () => clearInterval(interval);
-  }, [navigate, analysis]);
+  }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-forest-900 flex flex-col items-center justify-center px-4 py-8 text-white">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="relative w-24 h-24 mx-auto mb-6">
-            <div className="absolute inset-0 bg-forest-700 rounded-full animate-pulse-soft" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Satellite size={40} className="text-forest-300" />
+    <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900 flex flex-col items-center justify-center p-4 md:p-8">
+      <div className="max-w-2xl w-full space-y-6">
+
+        {/* HUD Scanner Box */}
+        <div className="bg-[#1B4332] text-white border border-emerald-900 rounded-2xl p-8 text-center relative overflow-hidden shadow-xl">
+          <div className="relative w-24 h-24 mx-auto mb-4">
+            <div className="absolute inset-0 bg-emerald-400/20 rounded-full animate-ping" />
+            <div className="absolute inset-0 border-2 border-emerald-400 rounded-full flex items-center justify-center bg-[#1B4332] shadow-inner">
+              <Satellite className="w-10 h-10 text-emerald-300" />
             </div>
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-forest-300 to-transparent animate-scan-line" />
           </div>
-          <h1 className="text-xl font-manrope font-bold text-white">Satellite Scan in Progress</h1>
-          <p className="text-xs text-forest-300 mt-2">Analyzing your farm with Sentinel-2 multispectral imagery</p>
+
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-[#2D6A4F] text-[#D1FAE5] border border-emerald-500/40 px-3 py-1 rounded-full inline-block mb-2">
+            Sentinel-2 Multi-Spectral Scanner
+          </span>
+          <h1 className="text-2xl font-extrabold font-manrope text-white">Satellite MRV Analysis HUD</h1>
+          <p className="text-xs text-emerald-100/80 mt-1 max-w-md mx-auto">
+            Processing Band 8 (NIR) & Band 4 (Red) canopy surface rasters for parcel verification.
+          </p>
+
+          {/* Linear Progress Bar */}
+          <div className="mt-6 max-w-md mx-auto space-y-2">
+            <div className="flex justify-between items-center text-xs font-semibold text-emerald-200">
+              <span>{mrvLocked ? 'Scan Complete' : 'Indexing Surface Rasters...'}</span>
+              <span className="font-mono">{progress}%</span>
+            </div>
+            <div className="w-full bg-emerald-950/80 border border-emerald-700/50 h-3 rounded-full overflow-hidden">
+              <div
+                className="bg-emerald-400 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          {mrvLocked && (
+            <div className="mt-6 inline-flex items-center gap-2 bg-[#2D6A4F] border border-emerald-400 text-[#D1FAE5] px-5 py-2 rounded-full text-xs font-bold font-mono shadow-md animate-in fade-in zoom-in duration-200">
+              <Lock className="w-4 h-4" />
+              <span>LOCKED : APPROVED MRV RECORD</span>
+            </div>
+          )}
         </div>
 
-        <div className="bg-forest-800/50 border border-forest-700 rounded-2xl p-5 space-y-3">
-          {logs.map((log, i) => {
-            const done = logIndex > i;
-            const active = logIndex === i;
-            return (
-              <div key={i} className={`flex items-center gap-3 transition-all ${i > logIndex ? 'opacity-30' : ''}`}>
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${done ? 'bg-forest-500 text-white' : active ? 'bg-forest-400 text-white' : 'bg-forest-700 text-forest-500'}`}>
-                  {done ? <CheckCircle2 size={14} /> : active ? <Cpu size={14} className="animate-pulse" /> : <span className="text-[8px] font-mono">{i + 1}</span>}
-                </div>
-                <span className={`text-xs font-mono ${done ? 'text-forest-200' : active ? 'text-white' : 'text-forest-500'}`}>{log}</span>
-              </div>
-            );
-          })}
-        </div>
+        {/* 3-Column Real-Time Metric Ribbon */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
+            <div className="flex items-center gap-2 text-emerald-700 mb-1">
+              <Sprout className="w-4 h-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Surface NDVI</span>
+            </div>
+            <p className="text-2xl font-extrabold text-slate-900 font-mono">0.78</p>
+            <p className="text-[11px] text-emerald-700 font-semibold">Active Healthy Vegetation</p>
+          </div>
 
-        <div className="mt-6 text-center">
-          <div className="inline-flex items-center gap-2 text-[10px] text-forest-400 font-mono">
-            <div className="w-2 h-2 bg-forest-400 rounded-full animate-pulse" />
-            <span>PROCESSING · {Math.round((logIndex / logs.length) * 100)}%</span>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
+            <div className="flex items-center gap-2 text-emerald-700 mb-1">
+              <Activity className="w-4 h-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Biodiversity Index</span>
+            </div>
+            <p className="text-2xl font-extrabold text-slate-900 font-mono">8.4 / 10</p>
+            <p className="text-[11px] text-emerald-700 font-semibold">High Ecosystem Score</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-1">
+            <div className="flex items-center gap-2 text-emerald-700 mb-1">
+              <Layers className="w-4 h-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Annual Sequestration</span>
+            </div>
+            <p className="text-2xl font-extrabold text-slate-900 font-mono">12.50 MT</p>
+            <p className="text-[11px] text-emerald-700 font-semibold">CO2e Yield Projection</p>
           </div>
         </div>
+
       </div>
     </div>
   );

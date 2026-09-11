@@ -1,180 +1,195 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, CheckCircle, XCircle, Cpu, ChevronDown, ChevronUp, FileText, MapPin, Building, ShieldCheck, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, AlertTriangle, Users, Layers, FileText, Check, X, Search } from 'lucide-react';
+import BadgePill from '../components/BadgePill';
 
 export default function AdminDashboard() {
-  const [queue, setQueue] = useState([]);
-  const [approvedCount, setApprovedCount] = useState(0);
-  const [activeFlags, setActiveFlags] = useState(0);
-  const [expandedId, setExpandedId] = useState(null);
+  const [badgeFilter, setBadgeFilter] = useState('ALL');
 
-  useEffect(() => {
-    const rameshVerified = localStorage.getItem('carbonx_farmer_docs_verified') === 'true';
-    const baseQueue = [
-      { id: 'q1', farmer: 'K. Ranga Rao', farm: 'Nalgonda Paddy Farm', area: '3.5 Ha', confidence: '94.2%', date: '20 May 2026', status: 'Needs Review',
-        documents: { aadhaar: 'aadhaar_ranga.jpg', aadhaarMatch: '94.2%', deed: 'pattadar_deed.pdf', deedNo: '8829/2022', upiId: 'ranga.rao@oksbi', cropPhotos: 'paddy_geotag.jpg', gps: '17.15 N, 79.16 E' },
-        ocrMetrics: { nameMatch: '94.2% (Matches DB)', surveyMatch: '98.5% (Match)', boundaries: 'Aligns with Nalgonda Revenue Map' },
-        fraudRisk: { level: 'Low Risk', score: 8, details: 'Zero overlapping claims. Clean agricultural usage.' } },
-      { id: 'q2', farmer: 'M. Chennappa', farm: 'Mahbubnagar Cotton', area: '4.8 Ha', confidence: '81.5%', date: '19 May 2026', status: 'Flagged (NDVI)',
-        documents: { aadhaar: 'aadhaar_chennappa.jpg', aadhaarMatch: '81.5% (Typo)', deed: 'deed_cotton.pdf', deedNo: '9901/2021', upiId: 'chennappa@okaxis', cropPhotos: 'cotton_geotag.jpg', gps: '16.73 N, 78.00 E' },
-        ocrMetrics: { nameMatch: '81.5% (Surname mismatch)', surveyMatch: '91.2% (12% dimension diff)', boundaries: '0.12 Ha overlap with forest' },
-        fraudRisk: { level: 'High Risk', score: 81, details: 'NDVI shows deforestation. Boundary overlap with reserve forest.' } },
-      { id: 'q3', farmer: 'P. Lakshmi', farm: 'Khammam Agroforestry', area: '2.1 Ha', confidence: '98.9%', date: '19 May 2026', status: 'Pending Verification',
-        documents: { aadhaar: 'aadhaar_lakshmi.jpg', aadhaarMatch: '98.9%', deed: 'khammam_deed.pdf', deedNo: '1240/2023', upiId: 'lakshmi.p@okhdfc', cropPhotos: 'teak_geotag.jpg', gps: '17.24 N, 80.14 E' },
-        ocrMetrics: { nameMatch: '98.9% (Perfect)', surveyMatch: '99.8% (Exact match)', boundaries: 'Perfect containment' },
-        fraudRisk: { level: 'Low Risk', score: 4, details: 'Verified teak plantation. Strong carbon profile.' } },
-    ];
-    const rameshItem = {
-      id: 'q_ramesh', farmer: 'Ramesh Kumar', farm: 'North Grove Plot', area: '4.28 Ha', confidence: '99.4%', date: '21 May 2026',
-      status: rameshVerified ? 'Needs Review' : 'Draft - Awaiting Onboarding',
-      documents: { aadhaar: 'aadhaar_ramesh.jpg', aadhaarMatch: '99.4%', deed: 'pattadar_passbook.pdf', deedNo: '184/A/2', upiId: 'ramesh.kumar@oksbi', cropPhotos: 'rice_geotag.jpg', gps: '17.96 N, 79.59 E' },
-      ocrMetrics: { nameMatch: '99.4% (Aadhaar & Bank match)', surveyMatch: '99.2% (Survey 184/A/2 matches Bhuvan)', boundaries: 'Coherent boundaries, zero leakage' },
-      fraudRisk: { level: 'Low Risk', score: 2, details: 'Zero double-selling. NDVI confirms active paddy since 2023.' },
-    };
-    setQueue([rameshItem, ...baseQueue]);
-  }, []);
+  const [complianceQueue, setComplianceQueue] = useState([
+    {
+      id: 'ADM-001',
+      farmer: 'Padma Bai',
+      survey: '124/B',
+      village: 'Pochampally',
+      acres: 2.20,
+      issue: 'ST_Intersects overlap collision detected with Survey 124/A',
+      riskScore: 88,
+      assignedBadge: 'PENDING',
+      status: 'FLAGGED'
+    },
+    {
+      id: 'ADM-002',
+      farmer: 'K. Ramesh',
+      survey: '124/A',
+      village: 'Pochampally',
+      acres: 2.50,
+      issue: 'Zero collision. Exact Cadastral match.',
+      riskScore: 4,
+      assignedBadge: 'REGISTRY',
+      status: 'APPROVED'
+    },
+    {
+      id: 'ADM-003',
+      farmer: 'B. Lakshmi',
+      survey: '88/B',
+      village: 'Mothkur',
+      acres: 1.80,
+      issue: 'RoR 1B document OCR verified.',
+      riskScore: 12,
+      assignedBadge: 'REGISTRY_DOC',
+      status: 'APPROVED'
+    }
+  ]);
 
-  const handleAction = (id, type) => {
-    if (type === 'approve') { setApprovedCount(p => p + 1); setQueue(p => p.filter(q => q.id !== id)); }
-    else if (type === 'reject') { setActiveFlags(p => Math.max(0, p - 1)); setQueue(p => p.filter(q => q.id !== id)); }
-    setExpandedId(null);
+  const handleApprove = (id) => {
+    setComplianceQueue(complianceQueue.map(item => item.id === id ? { ...item, status: 'APPROVED', assignedBadge: 'FPO', riskScore: 15 } : item));
+  };
+
+  const handleReject = (id) => {
+    setComplianceQueue(complianceQueue.map(item => item.id === id ? { ...item, status: 'REJECTED', assignedBadge: 'PENDING', riskScore: 99 } : item));
   };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-2xl border border-forest-100 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center"><ShieldAlert className="w-6 h-6" /></div>
+    <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-8 px-4 md:px-10">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex justify-between items-center">
           <div>
-            <span className="text-[10px] text-carbon-400 font-bold uppercase tracking-wider">Compliance Console</span>
-            <h1 className="text-lg font-extrabold text-forest-800">Verification & Governance</h1>
+            <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full inline-block mb-1">
+              Integrity Oversight
+            </span>
+            <h1 className="text-2xl font-extrabold text-slate-900 font-manrope">Platform Compliance & Audit Desk</h1>
+            <p className="text-xs text-slate-500 mt-0.5">PostGIS spatial collision auditing, hash duplicate prevention & trust badge governance.</p>
+          </div>
+          <ShieldCheck className="w-10 h-10 text-slate-800" />
+        </div>
+
+        {/* System-wide Compliance Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Onboarded Farmers</p>
+            <p className="text-2xl font-extrabold text-slate-900 font-manrope mt-1">1,420 Farmers</p>
+            <p className="text-xs text-emerald-700 font-medium mt-1">Across 10 Telangana Mandals</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Credit Listings</p>
+            <p className="text-2xl font-extrabold text-slate-900 font-manrope mt-1">85 Listings</p>
+            <p className="text-xs text-emerald-700 font-medium mt-1">Volume: 14,200 MT CO2e</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fraud Flags Raised</p>
+            <p className="text-2xl font-extrabold text-rose-800 font-manrope mt-1">3 Overlaps</p>
+            <p className="text-xs text-rose-700 font-medium mt-1">ST_Intersects spatial collision</p>
+          </div>
+
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Aggregate Carbon Offsets</p>
+            <p className="text-2xl font-extrabold text-emerald-800 font-manrope mt-1">285.4K Tonnes</p>
+            <p className="text-xs text-emerald-700 font-medium mt-1">Verified via Sentinel-2 MRV</p>
           </div>
         </div>
-        <span className="text-[10px] bg-rose-50 text-rose-600 border border-rose-100 px-3 py-1 rounded-full font-bold uppercase tracking-wider">Verifier</span>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white p-5 rounded-2xl border border-forest-100 shadow-sm">
-          <span className="text-[9px] text-carbon-400 font-bold tracking-wider uppercase">Farms Approved</span>
-          <h3 className="text-3xl font-black text-forest-800 mt-1">{approvedCount}</h3>
-          <p className="text-[10px] text-forest-600 font-bold mt-1.5 flex items-center gap-1"><ShieldCheck size={12} /> Contracts Issued</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm">
-          <span className="text-[9px] text-rose-500 font-bold tracking-wider uppercase flex items-center gap-1"><AlertTriangle size={11} /> Active Flags</span>
-          <h3 className="text-3xl font-black text-rose-600 mt-1">{activeFlags}</h3>
-          <p className="text-[10px] text-rose-500 mt-1.5">Sentinel Alerts</p>
-        </div>
-        <div className="bg-forest-900 text-white p-5 rounded-2xl shadow-sm">
-          <span className="text-[9px] text-forest-300 font-bold tracking-wider uppercase flex items-center gap-1"><Cpu className="w-3.5 h-3.5" /> Market Volume</span>
-          <h3 className="text-3xl font-black text-forest-300 mt-1">0</h3>
-          <p className="text-[10px] text-forest-300 mt-1.5">Credits Traded</p>
-        </div>
-      </div>
+        {/* Trust Engine Badge Breakdown */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-4">
+          <h2 className="text-base font-bold text-slate-900">Verification Badge Governance Breakdown</h2>
 
-      <div className="flex items-center justify-between mb-4 px-1">
-        <h4 className="text-xs font-bold text-carbon-500 uppercase tracking-wider">Review Queue ({queue.length})</h4>
-        <span className="text-[9px] bg-forest-50 border border-forest-100 text-forest-800 px-3 py-1 rounded-full font-bold">OCR V2.4</span>
-      </div>
-
-      <div className="space-y-4">
-        {queue.length === 0 ? (
-          <div className="p-12 bg-white rounded-2xl text-center border border-forest-100 text-carbon-500 text-sm shadow-sm">
-            <CheckCircle className="w-12 h-12 text-forest-500 mx-auto mb-3" />
-            <p className="font-bold">Review Queue is Clear</p>
-            <p className="text-xs text-carbon-400 mt-1">All farm plots verified and mapped.</p>
-          </div>
-        ) : queue.map(item => {
-          const isFlagged = item.status.includes('Flagged');
-          const isDraft = item.status.includes('Draft');
-          const isExpanded = expandedId === item.id;
-          return (
-            <div key={item.id} className={`bg-white rounded-2xl border shadow-sm transition-all overflow-hidden ${isExpanded ? 'ring-2 ring-forest-400 border-forest-300' : isFlagged ? 'border-rose-200' : 'border-forest-100'}`}>
-              <div onClick={() => setExpandedId(prev => prev === item.id ? null : item.id)} className="p-5 flex justify-between items-center cursor-pointer select-none">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h5 className="text-sm font-extrabold text-carbon-800">{item.farm}</h5>
-                    {item.id === 'q_ramesh' && <span className="bg-forest-100 text-forest-800 text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase">Your Farmer</span>}
-                  </div>
-                  <p className="text-xs text-carbon-400 mt-0.5">Farmer: <span className="font-bold text-carbon-700">{item.farmer}</span> · {item.area} · {item.date}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`text-[9px] px-2.5 py-1 rounded-full font-bold uppercase ${isFlagged ? 'bg-rose-100 text-rose-800' : isDraft ? 'bg-amber-100 text-amber-800' : 'bg-forest-50 text-forest-800'}`}>{item.status}</span>
-                  {isExpanded ? <ChevronUp size={16} className="text-carbon-400" /> : <ChevronDown size={16} className="text-carbon-400" />}
-                </div>
-              </div>
-
-              {!isExpanded && (
-                <div className="px-5 pb-5 grid grid-cols-3 gap-2 text-xs border-t border-forest-50 pt-3">
-                  <div><span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">OCR Confidence</span><p className={`font-bold mt-0.5 ${isFlagged ? 'text-rose-600' : 'text-forest-600'}`}>{item.confidence}</p></div>
-                  <div><span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">Risk</span><p className={`font-bold mt-0.5 ${item.fraudRisk.score > 50 ? 'text-rose-600' : 'text-forest-600'}`}>{item.fraudRisk.level}</p></div>
-                  <div><span className="text-[9px] uppercase tracking-wider text-carbon-400 font-bold">Action</span><p className="font-semibold text-forest-600 mt-0.5">Click to audit</p></div>
-                </div>
-              )}
-
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="border-t border-forest-100 bg-forest-50/20">
-                    <div className="p-5 space-y-5">
-                      <div>
-                        <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider mb-2">Uploaded Documents</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          {[
-                            { label: 'Aadhaar KYC', icon: FileText, value: item.documents.aadhaar, badge: `OCR: ${item.documents.aadhaarMatch}` },
-                            { label: 'Land Deed', icon: FileText, value: item.documents.deed, badge: `Deed: ${item.documents.deedNo}` },
-                            { label: 'Bank/UPI', icon: Building, value: item.documents.upiId, badge: 'UPI OK' },
-                            { label: 'Geo-Tagged Photos', icon: MapPin, value: item.documents.cropPhotos, badge: `GPS: ${item.documents.gps}` },
-                          ].map((d, i) => (
-                            <div key={i} className="bg-white border border-forest-100 p-3 rounded-xl h-24 flex flex-col justify-between">
-                              <span className="text-[9px] font-bold text-carbon-400">{d.label}</span>
-                              <div className="flex items-center gap-1.5 text-xs text-forest-800 font-bold"><d.icon size={14} className="text-forest-600" /><span className="truncate max-w-[100px]">{d.value}</span></div>
-                              <span className="text-[8px] bg-forest-50 text-forest-800 px-1.5 py-0.5 rounded font-mono font-bold self-start">{d.badge}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-forest-100 rounded-xl p-4">
-                        <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider mb-3">AI OCR Results</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                          <div className="bg-forest-50/40 p-2.5 rounded-xl"><span className="text-[8px] uppercase text-carbon-400 font-bold">Name Match</span><p className="font-bold text-carbon-800 mt-1">{item.ocrMetrics.nameMatch}</p></div>
-                          <div className="bg-forest-50/40 p-2.5 rounded-xl"><span className="text-[8px] uppercase text-carbon-400 font-bold">Survey Match</span><p className="font-bold text-carbon-800 mt-1">{item.ocrMetrics.surveyMatch}</p></div>
-                          <div className="bg-forest-50/40 p-2.5 rounded-xl"><span className="text-[8px] uppercase text-carbon-400 font-bold">GIS Overlaps</span><p className="font-bold text-carbon-800 mt-1">{item.ocrMetrics.boundaries}</p></div>
-                        </div>
-                      </div>
-
-                      <div className={`border rounded-xl p-4 bg-white ${item.fraudRisk.score > 50 ? 'border-rose-200' : 'border-forest-100'}`}>
-                        <div className="flex justify-between items-center mb-3">
-                          <h6 className="text-[10px] font-bold text-forest-800 uppercase tracking-wider">Fraud Risk Index</h6>
-                          <span className={`text-[10px] font-black uppercase ${item.fraudRisk.score > 50 ? 'text-rose-600' : 'text-forest-600'}`}>{item.fraudRisk.level}</span>
-                        </div>
-                        <div className="w-full h-2 bg-carbon-50 rounded-full overflow-hidden mb-2">
-                          <div className={`h-full rounded-full ${item.fraudRisk.score > 50 ? 'bg-gradient-to-r from-orange-500 to-rose-600' : 'bg-gradient-to-r from-forest-500 to-teal-500'}`}
-                            style={{ width: `${item.fraudRisk.score}%` }} />
-                        </div>
-                        <p className={`text-xs ${item.fraudRisk.score > 50 ? 'text-rose-600' : 'text-carbon-500'}`}>{item.fraudRisk.details}</p>
-                      </div>
-
-                      {!isDraft ? (
-                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-forest-100">
-                          <button onClick={() => handleAction(item.id, 'reject')} className="py-3 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-all text-xs font-bold flex items-center justify-center gap-1.5">
-                            <XCircle className="w-4 h-4" /><span>Reject & Flag</span>
-                          </button>
-                          <button onClick={() => handleAction(item.id, 'approve')} className="py-3 rounded-xl bg-forest-800 text-white hover:bg-forest-900 transition-all text-xs font-bold flex items-center justify-center gap-1.5">
-                            <CheckCircle className="w-4 h-4" /><span>Approve & Sync</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-center text-xs text-amber-800">
-                          Farmer has not submitted documents yet. Documents will appear here once KYC is completed.
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <BadgePill badge="REGISTRY" size="sm" />
+              <p className="text-xl font-bold text-slate-900 mt-2">420 Farms</p>
+              <p className="text-[10px] text-emerald-800">INR 340 / Credit</p>
             </div>
-          );
-        })}
+
+            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3 text-center">
+              <BadgePill badge="REGISTRY_DOC" size="sm" />
+              <p className="text-xl font-bold text-slate-900 mt-2">310 Farms</p>
+              <p className="text-[10px] text-emerald-800">INR 320 / Credit</p>
+            </div>
+
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-center">
+              <BadgePill badge="DOCUMENT" size="sm" />
+              <p className="text-xl font-bold text-slate-900 mt-2">280 Farms</p>
+              <p className="text-[10px] text-sky-800">INR 310 / Credit</p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+              <BadgePill badge="FPO" size="sm" />
+              <p className="text-xl font-bold text-slate-900 mt-2">390 Farms</p>
+              <p className="text-[10px] text-amber-800">INR 300 / Credit</p>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-center">
+              <BadgePill badge="PENDING" size="sm" />
+              <p className="text-xl font-bold text-rose-900 mt-2">20 Blocked</p>
+              <p className="text-[10px] text-rose-800">Trading Blocked</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Fraud Risk Inspector Table */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-4">
+          <h2 className="text-base font-bold text-slate-900">Fraud Risk Inspector Queue</h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                  <th className="py-3 px-4">Audit ID</th>
+                  <th className="py-3 px-4">Farmer & Survey</th>
+                  <th className="py-3 px-4">Village</th>
+                  <th className="py-3 px-4">Acreage</th>
+                  <th className="py-3 px-4">Audit Finding / Issue</th>
+                  <th className="py-3 px-4">Risk Score</th>
+                  <th className="py-3 px-4">Badge</th>
+                  <th className="py-3 px-4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {complianceQueue.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 font-mono text-slate-600">{item.id}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">{item.farmer} ({item.survey})</td>
+                    <td className="py-3 px-4 text-slate-700">{item.village}</td>
+                    <td className="py-3 px-4 text-slate-900">{item.acres} Acres</td>
+                    <td className="py-3 px-4 text-slate-700">{item.issue}</td>
+                    <td className="py-3 px-4">
+                      <span className={`font-mono font-bold px-2 py-0.5 rounded text-[10px] ${
+                        item.riskScore > 50 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-900'
+                      }`}>
+                        {item.riskScore} / 100
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <BadgePill badge={item.assignedBadge} size="sm" />
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprove(item.id)}
+                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center gap-1"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          onClick={() => handleReject(item.id)}
+                          className="px-2.5 py-1 bg-rose-800 hover:bg-rose-700 text-white rounded text-[10px] font-bold flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );

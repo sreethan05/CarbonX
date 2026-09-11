@@ -1,118 +1,297 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Loader2, MapPin, Calendar } from 'lucide-react';
+import { Search, MapPin, Calendar, ShoppingCart, CheckCircle2, ChevronRight, Minus, Plus, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getMarketplaceListings, combinedCredits } from '../services/api';
-
-function formatListing(row) {
-  const c = combinedCredits({ carbon_tonnes: row.carbon_credits, biodiversity_credits: row.biodiversity_credits, total_credits: row.total_credits });
-  return { id: row.id, farmer: row.farmer_name || 'Farmer', location: row.location || '', crop: row.crop || 'Carbon Credits',
-    carbon: c.carbon, biodiversity: c.biodiversity, total: c.total, price: row.price_per_credit || 520,
-    tokenId: row.token_id, bids: row.bids_count || 0, status: row.status || 'Active' };
-}
 
 export default function Marketplace() {
   const navigate = useNavigate();
-  const { role } = useAuth();
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const { user } = useAuth();
+
+  const [searchQuery, setSearchQuery] = useState('');
   const [quantities, setQuantities] = useState({});
+  const [checkoutModalItem, setCheckoutModalItem] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    getMarketplaceListings().then(res => {
-      if (res.success && res.listings) setListings(res.listings.map(formatListing));
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+  const listingsData = [
+    {
+      id: 'LST-001',
+      crop: 'Paddy',
+      farmer: 'Marketplace Farmer',
+      location: 'Chevella, Rangareddy',
+      available: '1.14',
+      carbonScore: '0.47',
+      bioScore: '0.67',
+      price: '550',
+      status: 'Active',
+      badge: 'REGISTRY'
+    },
+    {
+      id: 'LST-002',
+      crop: 'Rice',
+      farmer: 'Test Farmer',
+      location: 'Moinabad, Rangareddy',
+      available: '96',
+      carbonScore: '0.82',
+      bioScore: '0.75',
+      price: '550',
+      status: 'Active',
+      badge: 'REGISTRY_DOC'
+    },
+    {
+      id: 'LST-003',
+      crop: 'Cotton',
+      farmer: 'Venkat Rao',
+      location: 'Pochampally, Yadadri Bhuvanagiri',
+      available: '12.5',
+      carbonScore: '0.78',
+      bioScore: '0.84',
+      price: '340',
+      status: 'Active',
+      badge: 'REGISTRY'
+    },
+    {
+      id: 'LST-004',
+      crop: 'Maize',
+      farmer: 'B. Lakshmi',
+      location: 'Mothkur, Yadadri Bhuvanagiri',
+      available: '58.0',
+      carbonScore: '0.71',
+      bioScore: '0.72',
+      price: '320',
+      status: 'Active',
+      badge: 'REGISTRY_DOC'
+    },
+    {
+      id: 'LST-005',
+      crop: 'Paddy',
+      farmer: 'M. Narsimha',
+      location: 'Bonakal, Khammam, Telangana',
+      available: '38.0',
+      carbonScore: '0.65',
+      bioScore: '0.68',
+      price: '310',
+      status: 'Active',
+      badge: 'DOCUMENT'
+    }
+  ];
 
-  const filtered = listings.filter(l =>
-    !search || l.crop.toLowerCase().includes(search.toLowerCase()) || l.location.toLowerCase().includes(search.toLowerCase())
-  );
+  const getQuantity = (id) => quantities[id] || 1;
 
-  const handleQuantityChange = (id, change) => {
-    setQuantities(prev => ({
-      ...prev,
-      [id]: Math.max(1, (prev[id] || 1) + change)
-    }));
+  const updateQuantity = (id, delta) => {
+    const current = getQuantity(id);
+    const updated = Math.max(1, current + delta);
+    setQuantities({ ...quantities, [id]: updated });
+  };
+
+  const filteredListings = listingsData.filter(item => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      item.crop.toLowerCase().includes(query) ||
+      item.farmer.toLowerCase().includes(query) ||
+      item.location.toLowerCase().includes(query)
+    );
+  });
+
+  const handleBuyClick = (item) => {
+    setCheckoutModalItem(item);
+    setPaymentSuccess(false);
+  };
+
+  const handleConfirmPurchase = () => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setPaymentSuccess(true);
+      setTimeout(() => {
+        setCheckoutModalItem(null);
+        setPaymentSuccess(false);
+        navigate('/buyer/certificates/CX-2026-CERT-00123');
+      }, 1500);
+    }, 1000);
   };
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-4xl mx-auto">
-      <h1 className="text-lg font-bold text-carbon-900 mb-4">Carbon Credit Marketplace</h1>
+    <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900 py-8 px-4 md:px-10">
+      <div className="max-w-6xl mx-auto space-y-6">
 
-      <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-carbon-400" />
-        <input type="text" placeholder="Search by crop or location..." value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-white border border-forest-100 rounded-2xl text-xs font-semibold focus:outline-none focus:border-forest-600 focus:ring-2 focus:ring-forest-100" />
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-forest-700" /></div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white border border-dashed border-forest-200 rounded-2xl p-8 text-center text-sm text-carbon-500">
-          No listings available yet. {role === 'farmer' && 'Create a listing from your dashboard to sell credits.'}
-        </div>
-      ) : (
-        <div className="flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 p-2">
-          {filtered.map((l) => (
-            <div key={l.id} className="border-b border-gray-100 py-6 px-4 last:border-0 hover:bg-gray-50/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex-1">
-                {/* Title */}
-                <h3 className="text-lg font-bold text-gray-900 mb-0.5">{l.crop}</h3>
-                
-                {/* Subtitle / Farmer Name */}
-                <p className="text-[15px] text-gray-600 mb-2">{l.farmer}</p>
-                
-                {/* Location / Date */}
-                <div className="flex items-center gap-4 text-[13px] text-gray-500 mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin size={14} className="text-gray-400" />
-                    <span>{l.location || 'Unknown Location'}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={14} className="text-gray-400" />
-                    <span>Available: {l.total}</span>
-                  </div>
-                </div>
-
-                {/* Tags row */}
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
-                    Carbon: {l.carbon}
-                  </span>
-                  <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
-                    Bio: {l.biodiversity}
-                  </span>
-                  <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
-                    ₹{l.price}/credit
-                  </span>
-                  {l.status && (
-                    <span className="px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-full">
-                      {l.status}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Right side action area */}
-              <div className="flex items-center gap-3 md:pl-6">
-                 <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
-                   <button onClick={() => handleQuantityChange(l.id, -1)} className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 font-medium transition-colors">-</button>
-                   <span className="px-3 text-sm font-semibold w-10 text-center border-x border-gray-300">{quantities[l.id] || 1}</span>
-                   <button onClick={() => handleQuantityChange(l.id, 1)} className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 font-medium transition-colors">+</button>
-                 </div>
-                 <button 
-                   onClick={() => alert(`Buying ${quantities[l.id] || 1} credits!`)}
-                   className="text-[15px] font-semibold text-gray-700 hover:text-gray-900 flex items-center gap-1 transition-colors">
-                   Buy {'>'}
-                 </button>
-              </div>
+        {/* Header & Search Bar */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-extrabold text-[#0F172A] font-manrope">Carbon Credit Marketplace</h1>
+              <p className="text-xs text-slate-500 mt-0.5">Direct agricultural carbon offset procurement from verified Telangana farms.</p>
             </div>
-          ))}
+
+            <button
+              onClick={() => navigate('/marketplace/checkout')}
+              className="px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+            >
+              <ShoppingCart className="w-4 h-4 text-emerald-300" />
+              <span>Bulk Auto-Match Engine</span>
+            </button>
+          </div>
+
+          {/* Full-width clean white search bar */}
+          <div className="relative w-full">
+            <Search className="w-5 h-5 text-slate-400 absolute left-5 top-4" />
+            <input
+              type="text"
+              placeholder="Search by crop or location..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-13 pr-6 py-3.5 bg-white border border-slate-200 rounded-full text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-600 font-medium"
+            />
+          </div>
         </div>
-      )}
+
+        {/* Listing Cards Stack */}
+        <div className="space-y-4">
+          {filteredListings.map(item => {
+            const qty = getQuantity(item.id);
+            return (
+              <div
+                key={item.id}
+                className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm hover:border-slate-300 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+              >
+                {/* Left Data Column */}
+                <div className="space-y-3 flex-1 min-w-0">
+                  <div>
+                    <h2 className="text-lg font-bold text-[#0F172A] font-manrope">{item.crop}</h2>
+                    <p className="text-sm font-semibold text-[#4B5563] mt-0.5">{item.farmer}</p>
+                  </div>
+
+                  {/* Details Line */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>{item.location}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Available: {item.available}</span>
+                    </div>
+                  </div>
+
+                  {/* Metric & Status Chips Row */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-md border border-slate-200">
+                      Carbon: {item.carbonScore}
+                    </span>
+                    <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-md border border-slate-200">
+                      Bio: {item.bioScore}
+                    </span>
+                    <span className="px-3 py-1 bg-slate-100 text-slate-800 text-xs font-bold rounded-md border border-slate-200 font-mono">
+                      ₹{item.price}/credit
+                    </span>
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-md border border-emerald-200">
+                      {item.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Stepper & Purchase Column */}
+                <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                  <div className="flex items-center border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(item.id, -1)}
+                      className="p-1 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+
+                    <span className="font-mono text-sm font-bold text-slate-900 min-w-[20px] text-center">
+                      {qty}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(item.id, 1)}
+                      className="p-1 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleBuyClick(item)}
+                    className="px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <span>Buy</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Purchase Escrow Confirmation Modal */}
+        {checkoutModalItem && (
+          <div className="fixed inset-0 z-50 bg-[#1B4332]/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 shadow-xl rounded-2xl p-6 max-w-md w-full space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-base font-bold text-[#0F172A]">Confirm Credit Escrow Purchase</h3>
+                <button onClick={() => setCheckoutModalItem(null)} className="p-1 hover:bg-slate-100 rounded-lg">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+
+              {paymentSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-4 rounded-xl text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-700 mx-auto" />
+                  <p className="font-bold text-sm">Escrow Credit Purchase Complete!</p>
+                  <p className="text-xs text-slate-600">Redirecting to official certificate...</p>
+                </div>
+              ) : (
+                <div className="space-y-4 text-xs">
+                  <div className="bg-[#F8FAF8] border border-slate-200 rounded-xl p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-semibold">Crop Parcel:</span>
+                      <span className="font-bold text-slate-900">{checkoutModalItem.crop} ({checkoutModalItem.farmer})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-semibold">Location:</span>
+                      <span className="font-medium text-slate-800">{checkoutModalItem.location}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-semibold">Selected Volume:</span>
+                      <span className="font-mono font-bold text-emerald-800">{getQuantity(checkoutModalItem.id)} MT</span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-200 pt-2">
+                      <span className="text-slate-500 font-semibold">Total Escrow Value:</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        ₹{(getQuantity(checkoutModalItem.id) * parseFloat(checkoutModalItem.price)).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCheckoutModalItem(null)}
+                      className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmPurchase}
+                      disabled={isProcessing}
+                      className="flex-1 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                    >
+                      <span>{isProcessing ? 'Executing...' : 'Confirm & Lock Escrow'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

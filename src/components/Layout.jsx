@@ -6,40 +6,50 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import OfflineBanner from './OfflineBanner';
 
 const ROLE_NAV = {
   farmer: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
-    { name: 'KYC Verification', path: '/farm-verification', icon: ShieldCheck },
-    { name: 'Farm Analytics', path: '/farm-analytics', icon: Compass },
+    { name: 'Dashboard', path: '/farmer/dashboard', icon: Home },
+    { name: 'Land Verification', path: '/farmer/land-verification', icon: ShieldCheck },
+    { name: 'Carbon Passport', path: '/farmer/passport/TEL-124A', icon: Compass },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
-    { name: 'Carbon Wallet', path: '/wallet', icon: Wallet },
+    { name: 'Wallet & UPI Ledger', path: '/farmer/wallet', icon: Wallet },
+    { name: 'Support', path: '/support', icon: ClipboardList },
+  ],
+  fpo: [
+    { name: 'FPO Dashboard', path: '/fpo/dashboard', icon: Building2 },
+    { name: 'Credit Pooling', path: '/fpo/credit-pooling', icon: ShieldCheck },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   buyer: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
+    { name: 'ESG Dashboard', path: '/corporate/dashboard', icon: Home },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
-    { name: 'Credit Analysis', path: '/farm-analytics', icon: BarChart3 },
-    { name: 'Wallet', path: '/wallet', icon: Wallet },
+    { name: 'Bulk Auto-Match', path: '/marketplace/checkout', icon: BarChart3 },
+    { name: 'Certificates', path: '/buyer/certificates/CX-2026-CERT-00123', icon: ShieldCheck },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   verifier: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
-    { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
+    { name: 'FPO Audit Desk', path: '/fpo/dashboard', icon: Home },
+    { name: 'Admin Compliance', path: '/admin/dashboard', icon: ShieldCheck },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   admin: [
-    { name: 'Dashboard', path: '/dashboard', icon: Home },
-    { name: 'Marketplace', path: '/marketplace', icon: ClipboardList },
+    { name: 'Admin Dashboard', path: '/admin/dashboard', icon: Home },
+    { name: 'FPO Desk', path: '/fpo/dashboard', icon: Building2 },
+    { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
 };
 
 const ROLE_META = {
-  farmer:  { label: 'Farmer',          classes: 'bg-forest-50 text-forest-700' },
-  buyer:   { label: 'Corporate Buyer',  classes: 'bg-sky-50 text-sky-700' },
-  verifier:{ label: 'Verifier',         classes: 'bg-amber-50 text-amber-700' },
-  admin:   { label: 'Admin',            classes: 'bg-rose-50 text-rose-700' },
+  farmer:   { label: 'Farmer',          classes: 'bg-emerald-50 text-emerald-800 border border-emerald-200' },
+  fpo:      { label: 'FPO Officer',     classes: 'bg-amber-50 text-amber-800 border border-amber-200' },
+  buyer:    { label: 'Corporate Buyer', classes: 'bg-sky-50 text-sky-800 border border-sky-200' },
+  verifier: { label: 'Verifier',        classes: 'bg-amber-50 text-amber-800 border border-amber-200' },
+  admin:    { label: 'Admin Audit',     classes: 'bg-rose-50 text-rose-800 border border-rose-200' },
 };
 
 export default function Layout({ children }) {
@@ -181,6 +191,8 @@ export default function Layout({ children }) {
           )}
         </div>
       </header>
+
+      <OfflineBanner />
 
       {showNotifications && isAuthenticated && (
         <div className="fixed top-14 right-4 z-40 bg-white border border-forest-100 rounded-2xl shadow-xl p-4 w-80 max-h-96 overflow-y-auto">

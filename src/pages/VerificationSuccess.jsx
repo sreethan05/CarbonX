@@ -1,57 +1,88 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Calendar, ArrowRight, Cpu, FileText, Database } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Download, CheckCircle2, Hash, Layers } from 'lucide-react';
+import BadgePill from '../components/BadgePill';
 
 export default function VerificationSuccess() {
   const navigate = useNavigate();
 
-  const steps = [
-    { icon: FileText, title: '1. Land Deed Indexed', desc: 'Land record matching complete with PM-Kisan & Bhuvan Cadastral indices.' },
-    { icon: Database, title: '2. Soil Baseline Scanned', desc: 'Historic NDVI calculations mapped back to 2023.' },
-    { icon: Cpu, title: '3. Blockchain Credit Minting', desc: 'Sequestration results tokenized as ERC-1155 credits.' },
-  ];
-
   return (
-    <div className="min-h-screen bg-warm-white flex flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="bg-white border border-forest-100 rounded-3xl p-8 shadow-card text-center">
-          <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <ShieldCheck size={36} className="text-forest-700" />
+    <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-10 px-4 flex items-center justify-center">
+      <div className="max-w-xl w-full space-y-6">
+
+        {/* Verification Card */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 text-center space-y-4">
+          <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center text-emerald-700 mx-auto">
+            <ShieldCheck className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-manrope font-bold text-carbon-900">Verification Initiated</h2>
-          <p className="text-xs text-carbon-500 mt-2 leading-relaxed">
-            Your land records, bank connections, and biometric markers are securely saved.
-          </p>
+
+          <div>
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+              Minting & Verification Milestone
+            </span>
+            <h1 className="text-2xl font-extrabold text-slate-900 font-manrope mt-2">
+              Farmland Verification Complete!
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Your parcel coordinates and satellite biomass scan have been sealed and minted into the ledger.
+            </p>
+          </div>
+
+          <div className="py-2">
+            <BadgePill badge="REGISTRY" size="lg" />
+          </div>
+
+          {/* Blockchain Transaction Hash Display */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between font-mono">
+            <div className="flex items-center gap-2 text-slate-600">
+              <Hash className="w-4 h-4 text-emerald-700" />
+              <span>Immutable Hash:</span>
+            </div>
+            <span className="font-bold text-slate-900 truncate max-w-[200px] sm:max-w-xs">
+              0x7f9a883ce42b91028471abc882
+            </span>
+          </div>
+
+          {/* Data Summary Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-left">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase">Parcel ID</p>
+              <p className="text-xs font-bold text-slate-900 mt-0.5">TEL-124/A</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase">Acreage</p>
+              <p className="text-xs font-bold text-slate-900 mt-0.5">2.50 Acres</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase">Baseline NDVI</p>
+              <p className="text-xs font-bold text-emerald-800 mt-0.5">0.78 Index</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase">Annual Credits</p>
+              <p className="text-xs font-bold text-emerald-800 mt-0.5">12.50 MT</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={() => alert('Downloading PDF Audit Report...')}
+              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Audit Report</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/farmer/dashboard')}
+              className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>Go to Farmer Dashboard</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white border border-forest-100 rounded-3xl p-6 shadow-card mt-4">
-          <h3 className="text-sm font-bold text-carbon-900 mb-1 flex items-center gap-2">
-            <Calendar size={16} className="text-forest-600" /> Satellite Pass & MRV Timeline
-          </h3>
-          <p className="text-[11px] text-carbon-500 mb-4 leading-relaxed">
-            Our automated system checks your farm's soil organic carbon and canopy density during scheduled satellite orbits.
-          </p>
-          <div className="space-y-3">
-            {steps.map((s, i) => {
-              const Icon = s.icon;
-              return (
-                <div key={i} className="flex gap-3 items-start">
-                  <div className="w-8 h-8 bg-forest-50 text-forest-700 rounded-xl flex items-center justify-center shrink-0">
-                    <Icon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-carbon-800">{s.title}</p>
-                    <p className="text-[10px] text-carbon-500 mt-0.5">{s.desc}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <button onClick={() => navigate('/dashboard')} className="w-full mt-4 py-3.5 bg-forest-800 text-white rounded-2xl text-sm font-bold hover:bg-forest-900 transition-colors flex items-center justify-center gap-2">
-          Continue to Dashboard <ArrowRight size={16} />
-        </button>
       </div>
     </div>
   );

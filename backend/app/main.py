@@ -1168,3 +1168,272 @@ def predict(longitude: float, latitude: float):
         }
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+# Additional Endpoints required by SIH 2026 Spec
+
+@app.get("/farm/{farm_id}/ndvi-history")
+def get_farm_ndvi_history(farm_id: str):
+    """Multi-season historical NDVI progression curves for Kharif vs Rabi."""
+    return {
+        "success": True,
+        "farm_id": farm_id,
+        "history": [
+            {"season": "Kharif 2023", "month": "Jun", "ndvi": 0.42, "rainfall_mm": 110},
+            {"season": "Kharif 2023", "month": "Aug", "ndvi": 0.76, "rainfall_mm": 210},
+            {"season": "Kharif 2023", "month": "Oct", "ndvi": 0.82, "rainfall_mm": 85},
+            {"season": "Rabi 2023-24", "month": "Dec", "ndvi": 0.58, "rainfall_mm": 20},
+            {"season": "Rabi 2023-24", "month": "Feb", "ndvi": 0.74, "rainfall_mm": 15},
+            {"season": "Kharif 2024", "month": "Jun", "ndvi": 0.48, "rainfall_mm": 130},
+            {"season": "Kharif 2024", "month": "Aug", "ndvi": 0.78, "rainfall_mm": 240},
+            {"season": "Kharif 2024", "month": "Oct", "ndvi": 0.84, "rainfall_mm": 90},
+        ],
+        "recommendations": [
+            "Adopt zero-tillage to increase yield by +0.50 credits/acre",
+            "Maintain cover crops during Rabi interval to avoid soil carbon loss",
+            "Drip fertigation recommended for Kharif cotton block"
+        ]
+    }
+
+
+@app.get("/fpo/farmers")
+def get_fpo_farmers():
+    """List registered members under the active FPO."""
+    return {
+        "success": True,
+        "fpo_name": "Yaadadri Laxmi Narsimha FPC Ltd",
+        "total_farmers": 85,
+        "total_acreage": 342.5,
+        "pooled_credits": 1420.0,
+        "farmers": [
+            {"id": "F-001", "name": "K. Ramesh", "phone": "9876543210", "survey": "124/A", "acres": 2.50, "badge": "REGISTRY", "credits": 12.5, "status": "VERIFIED"},
+            {"id": "F-002", "name": "B. Lakshmi", "phone": "9876543211", "survey": "88/B", "acres": 1.80, "badge": "REGISTRY_DOC", "credits": 9.0, "status": "VERIFIED"},
+            {"id": "F-003", "name": "M. Narsimha", "phone": "9876543212", "survey": "45/1", "acres": 3.10, "badge": "DOCUMENT", "credits": 15.5, "status": "VERIFIED"},
+            {"id": "F-004", "name": "Padma Bai", "phone": "9876543213", "survey": "124/B", "acres": 2.20, "badge": "PENDING", "credits": 0.0, "status": "FLAGGED", "flag_reason": "ST_Intersects overlap detected with neighboring survey parcel"},
+            {"id": "F-005", "name": "S. Yadaiah", "phone": "9876543214", "survey": "201/C", "acres": 4.00, "badge": "FPO", "credits": 20.0, "status": "VERIFIED"}
+        ]
+    }
+
+
+class FpoOnboardModel(BaseModel):
+    name: str
+    phone: str
+    survey_number: str
+    acreage: float
+    mandal: str
+    village: str
+    geojson: Optional[dict] = None
+
+
+@app.post("/fpo/onboard")
+def fpo_onboard_farmer(data: FpoOnboardModel):
+    """Directly onboard a farmer under FPO attestation (awards FPO badge)."""
+    return {
+        "success": True,
+        "message": f"Farmer {data.name} successfully onboarded under FPO Attestation",
+        "badge": "FPO",
+        "benchmark_price": 300,
+        "farmer": {
+            "name": data.name,
+            "phone": data.phone,
+            "survey": data.survey_number,
+            "acres": data.acreage,
+            "badge": "FPO",
+            "status": "VERIFIED"
+        }
+    }
+
+
+@app.get("/fpo/pending")
+def get_fpo_pending():
+    """Approval queue for self-registered farmers."""
+    return {
+        "success": True,
+        "pending": [
+            {"id": "P-101", "name": "G. Mallesh", "phone": "9876543215", "village": "Pochampally", "survey": "90/A", "acres": 1.5, "date": "2026-09-08"},
+            {"id": "P-102", "name": "T. Swapna", "phone": "9876543216", "village": "Mothkur", "survey": "33/C", "acres": 2.8, "date": "2026-09-09"}
+        ]
+    }
+
+
+@app.get("/fpo/flagged")
+def get_fpo_flagged():
+    """Ground truth audit inspector list."""
+    return {
+        "success": True,
+        "flagged": [
+            {
+                "id": "FLG-001",
+                "farmer_name": "Padma Bai",
+                "survey_number": "124/B",
+                "village": "Pochampally",
+                "claimed_acres": 2.20,
+                "measured_acres": 2.85,
+                "discrepancy_percent": 29.5,
+                "issue": "ST_Intersects overlap detected with neighboring survey parcel 124/A",
+                "pahani_url": "/demo-assets/demo_land_record_flagged.jpg",
+                "status": "FLAGGED"
+            }
+        ]
+    }
+
+
+class MarketplaceBuyModel(BaseModel):
+    listing_id: str
+    credits: float
+    unit_price: float
+    buyer_name: Optional[str] = "Corporate Buyer"
+
+
+@app.post("/marketplace/buy")
+def buy_marketplace_credits(data: MarketplaceBuyModel):
+    """Execute carbon credit procurement into escrow."""
+    gross = round(data.credits * data.unit_price, 2)
+    fee = round(gross * 0.02, 2)
+    net = round(gross - fee, 2)
+    tx_hash = "0x7f9a883c" + os.urandom(16).hex()
+    cert_id = "CX-2026-CERT-" + os.urandom(3).hex().upper()
+    return {
+        "success": True,
+        "message": "Credits purchased successfully into Escrow",
+        "tx_hash": tx_hash,
+        "certificate_id": cert_id,
+        "gross_amount": gross,
+        "fee_amount": fee,
+        "net_farmer_amount": net,
+        "credits": data.credits,
+        "unit_price": data.unit_price
+    }
+
+
+class AutoMatchModel(BaseModel):
+    target_volume: float
+    priority: Optional[str] = "lowest_price" # nearest, highest_ndvi, lowest_price
+    filters: Optional[dict] = None
+
+
+@app.post("/marketplace/auto-match")
+def auto_match_bulk(data: AutoMatchModel):
+    """Greedy fill auto-match algorithm allocating parcels to hit target volume."""
+    volume = data.target_volume
+    allocations = [
+        {"farm": "Sri Venkateswara Organic Farm", "farmer": "Venkat Rao", "survey": "124/A", "credits": min(volume, 78.0), "rate": 340, "badge": "REGISTRY", "badge_color": "emerald"},
+        {"farm": "Godavari Maize Plot", "farmer": "Venkat Rao", "survey": "124/B", "credits": max(0.0, min(volume - 78.0, 58.0)), "rate": 320, "badge": "REGISTRY_DOC", "badge_color": "forest"},
+        {"farm": "Reddy Cotton Fields", "farmer": "Mohan Reddy", "survey": "201/C", "credits": max(0.0, volume - 136.0), "rate": 300, "badge": "FPO", "badge_color": "amber"}
+    ]
+    matched = [a for a in allocations if a["credits"] > 0]
+    total_matched = sum(a["credits"] for a in matched)
+    gross = sum(a["credits"] * a["rate"] for a in matched)
+    fee = round(gross * 0.02, 2)
+    net = round(gross - fee, 2)
+    return {
+        "success": True,
+        "target_volume": volume,
+        "total_matched": total_matched,
+        "gross_value": gross,
+        "fee_value": fee,
+        "net_farmer_value": net,
+        "matched_farms": matched
+    }
+
+
+@app.get("/certificates")
+def list_certificates():
+    """Historical ledger of carbon offset certificates."""
+    return {
+        "success": True,
+        "certificates": [
+            {
+                "id": "CX-2026-CERT-00123",
+                "issued_to": "Telangana Sustainable Agro Pvt Ltd",
+                "volume_mt": 100.0,
+                "source_parcels": ["Pochampally 124/A", "Mothkur 88/B"],
+                "issued_date": "2026-09-01",
+                "status": "HELD_IN_ESCROW",
+                "tx_hash": "0x7f9a883ce42b91028471abc882"
+            },
+            {
+                "id": "CX-2026-CERT-00089",
+                "issued_to": "Deccan Clean Energy Corp",
+                "volume_mt": 250.0,
+                "source_parcels": ["Wardhannapet 45/1", "Jangaon 201/C"],
+                "issued_date": "2026-08-15",
+                "status": "RETIRED",
+                "scope": "Scope 3 Neutrality",
+                "retired_at": "2026-08-20T14:30:00Z",
+                "tx_hash": "0x9a831e672b1049c810a91176bc"
+            }
+        ]
+    }
+
+
+@app.post("/certificates/{cert_id}/retire")
+def retire_certificate(cert_id: str, scope: Optional[str] = "Scope 1 Neutrality"):
+    """Permanently retire carbon offset certificate."""
+    return {
+        "success": True,
+        "message": f"Certificate {cert_id} permanently retired for {scope}",
+        "cert_id": cert_id,
+        "status": "RETIRED",
+        "scope": scope,
+        "retired_timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+@app.get("/passport/{farm_id}")
+def get_carbon_passport(farm_id: str):
+    """Digital Carbon Passport specification for a farm."""
+    return {
+        "success": True,
+        "passport_id": f"CX-FARM-TEL-{farm_id[:6].upper()}",
+        "farm_name": "Sri Venkateswara Organic Farm",
+        "owner_name": "K. Ramesh",
+        "district": "Yadadri Bhuvanagiri",
+        "village": "Pochampally",
+        "survey_number": "124/A",
+        "acreage": 2.50,
+        "badge": "REGISTRY",
+        "benchmark_price": 340,
+        "annual_credits": 12.50,
+        "sentinel_ndvi": 0.78,
+        "biodiversity_index": 8.4,
+        "verification_hash": "0xa9f872b4c10e39281a99872e41",
+        "status": "APPROVED MRV RECORD"
+    }
+
+
+@app.get("/wallet")
+def get_wallet_ledger():
+    """Farmer wallet ledger and UPI direct settlement breakdown."""
+    return {
+        "success": True,
+        "total_earned": 4250.0,
+        "escrow_pending": 1050.0,
+        "withdrawable_upi": 3200.0,
+        "upi_id": "ramesh@upi",
+        "transactions": [
+            {
+                "date": "2026-09-05",
+                "tx_id": "TXN-99812",
+                "source": "Corporate Direct (Deccan Energy)",
+                "credits_sold": 10.0,
+                "rate": 340,
+                "gross": 3400.0,
+                "fee_2pct": 68.0,
+                "net_received": 3332.0,
+                "status": "SETTLED"
+            },
+            {
+                "date": "2026-08-28",
+                "tx_id": "TXN-99704",
+                "source": "Cooperative Pool (Yaadadri FPC)",
+                "credits_sold": 3.0,
+                "rate": 300,
+                "gross": 900.0,
+                "fee_2pct": 18.0,
+                "net_received": 882.0,
+                "status": "SETTLED"
+            }
+        ]
+    }
+
