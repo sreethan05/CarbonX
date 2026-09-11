@@ -145,7 +145,7 @@ create index if not exists marketplace_listings_status_idx
 create table if not exists public.kyc_verifications (
   id uuid primary key default gen_random_uuid(),
   owner_phone text not null references public.profiles(phone) on delete cascade,
-  status text not null check (status in ('VERIFIED', 'FLAGGED')),
+  status text not null check (status in ('VERIFIED', 'FLAGGED', 'PENDING')),
   reasons jsonb not null default '[]'::jsonb,
   checks jsonb not null default '{}'::jsonb,
   extracted_fields jsonb not null default '{}'::jsonb,

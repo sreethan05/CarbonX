@@ -35,6 +35,10 @@ export async function sendOtp(phone) {
   return post(`${PY}/send-otp`, { phone });
 }
 
+export async function verifyRegistrationOtp(phone, otp) {
+  return post(`${PY}/register/verify-otp`, { phone, otp });
+}
+
 export async function sendLoginOtp(phone) {
   return post(`${PY}/login/send-otp`, { phone });
 }
