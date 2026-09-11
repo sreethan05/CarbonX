@@ -12,7 +12,6 @@ create table if not exists public.fpos (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   registration_no text unique,
-  password text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -36,13 +35,16 @@ create table if not exists public.profiles (
   village text default '',
   upi text default '',
   aadhaar_last4 text default '',
-  role text not null default 'farmer' check (role in ('farmer', 'buyer', 'verifier', 'admin')),
+  role text not null default 'farmer' check (role in ('farmer', 'buyer', 'fpo', 'verifier', 'admin')),
   wallet_address text,
   preferred_language text not null default 'en',
   fpo_id uuid references public.fpos(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create index if not exists profiles_fpo_id_idx
+  on public.profiles(fpo_id);
 
 -- 4. OTP CODES TABLE
 create table if not exists public.otp_codes (
