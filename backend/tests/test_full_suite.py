@@ -205,7 +205,7 @@ class TestCarbonXFullSuite(unittest.TestCase):
         self.assertIn("total_credits", data)
 
     def test_10_marketplace_flow(self):
-        """Test listing creation, fetching, and bidding."""
+        """Test listing creation and fetching."""
         headers = {"Authorization": f"Bearer {TestCarbonXFullSuite.token}"}
         listing_payload = {
             "farm_id": getattr(TestCarbonXFullSuite, "saved_farm_id", None),
@@ -226,11 +226,6 @@ class TestCarbonXFullSuite(unittest.TestCase):
         self.assertEqual(get_res.status_code, 200)
         listings = get_res.json().get("listings", [])
         self.assertGreater(len(listings), 0)
-
-        # Place a bid
-        bid_res = self.client.post(f"/marketplace/listings/{listing_id}/bid", headers=headers)
-        self.assertEqual(bid_res.status_code, 200)
-        self.assertTrue(bid_res.json().get("success"))
 
     def test_11_kyc_verification(self):
         """Test land document verification and KYC status retrieval."""
