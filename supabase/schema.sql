@@ -1,40 +1,19 @@
 -- ==============================================================================
--- 3. ALL-IN-ONE UNIFIED SCHEMA (Sreethan Core MRV + Hasini FPO/Corporate)
+-- 3. ALL-IN-ONE UNIFIED SCHEMA (Sreethan Core MRV)
 -- Unified Master Database Migration for CarbonX
 -- Safe to run on any new or existing Supabase project. Zero destructive operations.
--- Includes all 7 tables:
---   1. fpos
---   2. corporates
---   3. profiles (with fpo_id)
---   4. otp_codes
---   5. farms (with full satellite & biodiversity columns)
---   6. marketplace_listings (with full carbon/bio credits & corporate trading)
---   7. kyc_verifications (with full document hash & geocoding)
--- ==============================================================================
+-- Includes the active tables used by the current app:
+--   1. profiles
+--   2. otp_codes
+--   3. farms
+--   4. marketplace_listings
+--   5. kyc_verifications
+-- ============================================================================== 
 
 -- 1. EXTENSIONS
 create extension if not exists pgcrypto;
 
--- 2. FPOS TABLE (Farmer Producer Organizations - Hasini)
-create table if not exists public.fpos (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  registration_no text unique,
-  password text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- 3. CORPORATES TABLE (Corporate Buyers & ESG - Hasini)
-create table if not exists public.corporates (
-  c_id uuid primary key default gen_random_uuid(),
-  name text not null,
-  password_hash text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- 4. PROFILES TABLE (Combined Sreethan & Hasini)
+-- 2. PROFILES TABLE
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   phone text not null unique,
@@ -47,7 +26,6 @@ create table if not exists public.profiles (
   role text not null default 'farmer' check (role in ('farmer', 'buyer', 'verifier', 'admin')),
   wallet_address text,
   preferred_language text not null default 'en',
-  fpo_id uuid references public.fpos(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -57,8 +35,6 @@ alter table public.profiles add column if not exists preferred_language text not
 alter table public.profiles add column if not exists wallet_address text;
 alter table public.profiles add column if not exists upi text default '';
 alter table public.profiles add column if not exists aadhaar_last4 text default '';
-alter table public.profiles add column if not exists fpo_id uuid references public.fpos(id) on delete set null;
-
 -- 5. OTP CODES TABLE (Phone Verification)
 create table if not exists public.otp_codes (
   phone text primary key,
@@ -197,8 +173,6 @@ alter table public.otp_codes enable row level security;
 alter table public.farms enable row level security;
 alter table public.marketplace_listings enable row level security;
 alter table public.kyc_verifications enable row level security;
-alter table public.corporates enable row level security;
-alter table public.fpos enable row level security;
 
 -- 10. FULL SERVICE ROLE & CLIENT ACCESS
 grant usage on schema public to service_role;
@@ -207,9 +181,7 @@ grant select, insert, update, delete on table
   public.otp_codes,
   public.farms,
   public.marketplace_listings,
-  public.kyc_verifications,
-  public.corporates,
-  public.fpos
+  public.kyc_verifications
 to service_role;
 
 grant usage on schema public to anon, authenticated;

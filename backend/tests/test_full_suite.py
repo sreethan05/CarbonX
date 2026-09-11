@@ -1,5 +1,6 @@
 import base64
 import io
+import os
 import sys
 import unittest
 import numpy as np
@@ -15,6 +16,11 @@ from app.services.ml_service import predict_biodiversity
 class TestCarbonXFullSuite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Force OTP dev mode AFTER app import (main.py load_dotenv
+        # override=True would clobber module-level env). phone_service
+        # reads env per-call, so this guarantees no real SMS in tests.
+        os.environ["TEXTPLATE_API_TOKEN"] = "test"
+        os.environ["TEXTPLATE_TEMPLATE_ID"] = "test"
         cls.client = TestClient(app)
         cls.test_phone = "9876543210"
         cls.valid_aadhaar = "200000000009"

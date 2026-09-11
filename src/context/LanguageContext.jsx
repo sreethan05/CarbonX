@@ -35,8 +35,6 @@ const translations = {
     farmerRoleDesc: "Register your land, visualize NDVI satellite metrics, and receive secure instant UPI carbon payouts.",
     corporateRole: "Corporate ESG Buyer",
     corporateRoleDesc: "Purchase high-fidelity verified carbon offsets, audit BRSR reports, and fund sustainable agroforestry.",
-    fpoRole: "FPO Coordinator",
-    fpoRoleDesc: "Manage cooperative farmer groups, aggregate soil organic carbon credits, and monitor group payouts.",
     adminRole: "ISRO / Govt Admin",
     adminRoleDesc: "Audit satellite anomaly flags, review drone KYC submissions, and monitor blockchain carbon minting.",
 
@@ -219,8 +217,6 @@ const translations = {
     farmerRoleDesc: "अपनी भूमि पंजीकृत करें, एनडीवीआई (NDVI) उपग्रह मेट्रिक्स देखें, और त्वरित यूपीआई कार्बन भुगतान प्राप्त करें।",
     corporateRole: "कॉर्पोरेट ईएसजी खरीदार",
     corporateRoleDesc: "सत्यापित कार्बन क्रेडिट खरीदें, बीआरएसआर रिपोर्ट ऑडिट करें, और स्थायी कृषि-वानिकी को वित्तपोषित करें।",
-    fpoRole: "एफपीओ (FPO) समन्वयक",
-    fpoRoleDesc: "सहकारी किसान समूहों का प्रबंधन करें, मिट्टी के जैविक कार्बन क्रेडिट को एकत्रित करें, और समूह भुगतान की निगरानी करें।",
     adminRole: "इसरो / सरकारी व्यवस्थापक",
     adminRoleDesc: "उपग्रह विसंगति झंडों का ऑडिट करें, ड्रोन केवाईसी प्रविष्टियों की समीक्षा करें, और ब्लॉकचेन कार्बन मिंटिंग की निगरानी करें।",
 
@@ -403,8 +399,6 @@ const translations = {
     farmerRoleDesc: "మీ భూమిని నమోదు చేసుకోండి, NDVI ఉపగ్రహ కొలతలను చూడండి మరియు తక్షణ UPI కార్బన్ చెల్లింపులను పొందండి.",
     corporateRole: "కార్పొరేట్ ESG కొనుగోలుదారు",
     corporateRoleDesc: "ధృవీకరించబడిన కార్బన్ క్రెడిట్లను కొనుగోలు చేయండి, BRSR నివేదికలను ఆడిట్ చేయండి మరియు స్థిరమైన వ్యవసాయ-అటవీపెంపకానికి నిధులు సమకూర్చండి.",
-    fpoRole: "FPO సమన్వయకర్త",
-    fpoRoleDesc: "సహకార రైతు సంఘాలను నిర్వహించండి, నేల సేంద్రీయ కార్బన్ క్రెడిట్లను సేకరించండి మరియు సమూహ చెల్లింపులను పర్యవేక్షించండి.",
     adminRole: "ISRO / ప్రభుత్వ నిర్వాహకుడు",
     adminRoleDesc: "ఉపగ్రహ క్రమరాహిత్య ఫ్లాగ్‌లను ఆడిట్ చేయండి, డ్రోన్ KYC సమర్పణలను సమీక్షించండి మరియు బ్లాక్‌చైన్ కార్బన్ మింటింగ్‌ను పర్యవేక్షించండి.",
 
