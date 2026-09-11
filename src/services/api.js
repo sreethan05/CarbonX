@@ -80,6 +80,10 @@ export async function sendVoiceAudioQuery({ file, language_code, session_id }) {
 
 // ── KYC ──
 
+export async function verifyAadhaar(payload) {
+  return post(`${PY}/verify-aadhaar`, payload);
+}
+
 export async function verifyLandDocument(payload) {
   return post(`${PY}/verify-land`, payload);
 }

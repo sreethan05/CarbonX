@@ -1,6 +1,5 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Leaf, PlusCircle, ArrowUpRight, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { MapPin, Leaf, PlusCircle, ArrowUpRight, ShieldCheck, AlertTriangle, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { combinedCredits } from '../services/api';
 
@@ -11,8 +10,9 @@ export default function FarmerDashboard() {
   const displayName = user?.name || 'Farmer';
   const displayLocation = [user?.village, user?.district].filter(Boolean).join(', ') || '';
   const kycStatus = kyc?.status || 'PENDING';
-  const isVerified = kycStatus === 'VERIFIED';
+  const isVerified = kyc?.status === 'VERIFIED';
   const isFlagged = kycStatus === 'FLAGGED';
+  const kycBadge = kyc?.badge || kyc?.extracted_fields?.badge;
 
   let totalCarbon = 0, totalBio = 0, totalCombined = 0, totalArea = 0;
   farms.forEach((f) => {
@@ -38,15 +38,15 @@ export default function FarmerDashboard() {
       </div>
 
       {/* KYC banner */}
-      {kycStatus === 'PENDING' && (
+      {!isVerified && (
         <button
           onClick={() => navigate('/farm-verification')}
           className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-center gap-3 text-left hover:bg-amber-100 transition-colors"
         >
           <ShieldCheck size={20} className="text-amber-600 shrink-0" />
           <div className="flex-1">
-            <p className="text-xs font-bold text-amber-900">Complete KYC Verification</p>
-            <p className="text-[11px] text-amber-700">Verify your land ownership to start earning carbon credits</p>
+            <p className="text-xs font-bold text-amber-900">Complete KYC Verification to start earning credits</p>
+            <p className="text-[11px] text-amber-700">Upload your Pahani land record to unlock the marketplace and wallet.</p>
           </div>
           <ArrowUpRight size={16} className="text-amber-600" />
         </button>
@@ -58,8 +58,10 @@ export default function FarmerDashboard() {
             <p className="text-xs font-bold text-forest-900">KYC Verified</p>
             <p className="text-[11px] text-forest-700">Your land ownership is confirmed</p>
           </div>
+          {kycBadge && <span className="ml-auto rounded-lg bg-white border border-forest-200 px-2 py-1 text-[9px] font-black tracking-wide text-forest-800">{kycBadge}</span>}
         </div>
       )}
+
       {isFlagged && (
         <button
           onClick={() => navigate('/farm-verification')}
@@ -146,6 +148,7 @@ export default function FarmerDashboard() {
           <span className="text-xs font-bold">Marketplace</span>
           <span className="text-[10px] text-carbon-500 mt-1">Browse carbon credit listings</span>
         </button>
+        <button onClick={() => navigate('/wallet')} className="col-span-2 flex items-center justify-center gap-2 py-3 border border-forest-100 bg-white rounded-2xl text-xs font-bold text-carbon-700 hover:bg-forest-50"><Wallet size={14} /> Open Carbon Wallet</button>
         {isVerified && (
           <button
             onClick={() => navigate('/create-listing')}

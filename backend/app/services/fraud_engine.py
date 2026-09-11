@@ -26,6 +26,7 @@ def run_fraud_checks(
     other_farm_geojsons: Optional[list] = None,
     claimed_area_ha: Optional[float] = None,
     skip_ocr: bool = False,
+    skip_ndvi: bool = False,
 ) -> dict:
     failed = []
     warnings = []
@@ -66,7 +67,7 @@ def run_fraud_checks(
         warnings.append("area_mismatch")
 
     ndvi = (checks.get("satellite_ndvi") or {}).get("ndvi")
-    if ndvi is not None and float(ndvi) < NDVI_FARMLAND_MIN:
+    if not skip_ndvi and ndvi is not None and float(ndvi) < NDVI_FARMLAND_MIN:
         warnings.append("ndvi_barren")
 
     hard = [c for c in failed]

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Compass, ShoppingCart, Wallet, Menu, Bell, Globe, X, LogOut,
-  ShieldCheck, ClipboardList, BarChart3, Sprout, Building2, ChevronLeft,
+  ShieldCheck, ClipboardList, BarChart3,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,7 +46,7 @@ const ROLE_META = {
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t, changeLanguage, currentLang } = useLanguage();
+  const { changeLanguage, currentLang } = useLanguage();
   const { user, logout, role, isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -73,7 +73,10 @@ export default function Layout({ children }) {
 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
-  const goTo = (path) => { navigate(path); setSidebarOpen(false); };
+  const goTo = (path) => {
+    navigate(path);
+    setSidebarOpen(false);
+  };
   const handleLogout = () => { logout(); navigate('/farmer-login'); };
 
   const renderNavItems = () => navItems.map((item) => {
@@ -241,7 +244,7 @@ export default function Layout({ children }) {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => goTo(item.path)}
               className="flex flex-col items-center justify-center gap-1 transition-all duration-200 flex-1"
             >
               <div className={active ? 'px-4 py-1.5 bg-forest-100 rounded-full flex items-center justify-center shadow-sm' : 'px-4 py-1.5 text-carbon-400'}>
