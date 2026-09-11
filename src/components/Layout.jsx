@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import FarmerVoiceAssistant from '../features/voice-agent/FarmerVoiceAssistant';
 
 const ROLE_NAV = {
   farmer: [
@@ -233,6 +234,8 @@ export default function Layout({ children }) {
           {children}
         </main>
       </div>
+
+      {isAuthenticated && role === 'farmer' && <FarmerVoiceAssistant />}
 
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-forest-100/50 py-2.5 px-4 flex justify-around items-center md:hidden shadow-lg">
         {navItems.slice(0, 5).map((item) => {

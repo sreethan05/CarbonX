@@ -59,6 +59,25 @@ export async function updateProfile(fields) {
   return patch(`${PY}/profile`, fields);
 }
 
+// Voice assistant
+
+export async function sendVoiceTextQuery(payload) {
+  return post(`${PY}/api/v1/voice/text-query`, payload);
+}
+
+export async function sendVoiceAudioQuery({ file, language_code, session_id }) {
+  const form = new FormData();
+  form.append('file', file);
+  if (language_code) form.append('language_code', language_code);
+  if (session_id) form.append('session_id', session_id);
+  const res = await fetch(`${PY}/api/v1/voice/query`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: form,
+  });
+  return res.json();
+}
+
 // ── KYC ──
 
 export async function verifyAadhaar(payload) {
