@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, AlertTriangle, ShieldCheck, Compass, Info, Check, Edit3, X } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
-import LeafletMap from '../components/LeafletMap';
+const LeafletMap = lazy(() => import('../components/LeafletMap'));
 import { useAuth } from '../context/AuthContext';
 
 function geojsonToLatLngs(geojson) {
@@ -182,6 +182,7 @@ export default function FarmMapRegistration() {
 
         {/* Interactive Leaflet Map Container */}
         <div className="z-0 relative h-[520px] rounded-2xl overflow-hidden shadow-card border border-forest-100">
+          <Suspense fallback={<div className="h-full flex items-center justify-center text-xs text-agriText-muted">Loading satellite map…</div>}>
           <LeafletMap
             readOnly={isReadOnly}
             initialPoints={mapInitialPoints}
@@ -192,6 +193,7 @@ export default function FarmMapRegistration() {
             showHeatmapToggle={true}
             height="100%"
           />
+          </Suspense>
         </div>
 
         {/* Action Bar */}

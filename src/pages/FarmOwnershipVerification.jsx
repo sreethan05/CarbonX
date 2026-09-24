@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
+import { verifyLandDocument } from '../services/api';
 
 export default function FarmOwnershipVerification() {
   const navigate = useNavigate();
@@ -417,7 +418,6 @@ export default function FarmOwnershipVerification() {
     setFpoSubmitting(true);
     setProceedBlocked('');
     try {
-      const { verifyLandDocument } = await import('../services/api');
       const base64 = await fileToBase64(pahaniFile);
       const res = await verifyLandDocument({
         document_name: pahaniFile.name || 'pahani.jpg',

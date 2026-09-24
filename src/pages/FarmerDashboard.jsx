@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapPin, ShieldCheck, Wallet, ArrowRight, Compass, AlertTriangle, Upload, Loader2, CheckCircle2 } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
-import LeafletMap from '../components/LeafletMap';
+const LeafletMap = lazy(() => import('../components/LeafletMap'));
 import { useAuth } from '../context/AuthContext';
 import { getMe, verifyLandDocument, analyzeFarm, saveFarm } from '../services/api';
 
@@ -273,12 +273,14 @@ export default function FarmerDashboard() {
               </div>
 
               <div className="h-[420px] rounded-2xl overflow-hidden border border-slate-200">
+                <Suspense fallback={<div className="h-full flex items-center justify-center text-xs text-slate-500">Loading map…</div>}>
                 <LeafletMap
                   onGeojsonDrawn={setDrawnGeojson}
-                  onAreaCalculated={(r) => r && setDrawnAreaHa(r.area)}
+                  onAreaCalculated={(r) => r && setDrawnGeojson && setDrawnAreaHa(r.area)}
                   showHeatmapToggle={false}
                   height="100%"
                 />
+                </Suspense>
               </div>
             </div>
 

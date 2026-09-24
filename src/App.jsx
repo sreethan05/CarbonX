@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import { LanguageProvider } from './context/LanguageContext';
@@ -16,7 +16,7 @@ import SuccessScreen from './pages/SuccessScreen';
 import FarmOwnershipVerification from './pages/FarmOwnershipVerification';
 import VerificationSuccess from './pages/VerificationSuccess';
 import FarmerDashboard from './pages/FarmerDashboard';
-import DetailedFarmAnalytics from './pages/DetailedFarmAnalytics';
+const DetailedFarmAnalytics = lazy(() => import('./pages/DetailedFarmAnalytics'));
 import CarbonWallet from './pages/CarbonWallet';
 import FPODashboard from './pages/FPODashboard';
 import FPOLogin from './pages/FPOLogin';
@@ -28,7 +28,11 @@ import Marketplace from './pages/Marketplace';
 import CreateListing from './pages/CreateListing';
 import CorporateCreditAnalysis from './pages/CorporateCreditAnalysis';
 import CertificateRetirementPage from './pages/CertificateRetirementPage';
-import SupportCenter from './pages/SupportCenter';
+const SupportCenter = lazy(() => import('./pages/SupportCenter'));
+
+function RouteFallback() {
+  return <div className="min-h-screen flex items-center justify-center text-xs text-carbon-500">Loading…</div>;
+}
 
 function ProtectedRoute({ children, roles, redirectTo = '/farmer/login' }) {
   const { isAuthenticated, role } = useAuth();
@@ -89,8 +93,8 @@ export default function App() {
               {/* Farmer Dashboard & Analytics & Wallet */}
               <Route path="/farmer/dashboard" element={<ProtectedRoute roles={['farmer']}><FarmerDashboard /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute roles={['farmer', 'buyer', 'fpo', 'verifier', 'admin']}><DashboardRouter /></ProtectedRoute>} />
-              <Route path="/farmer/passport/:farmId" element={<ProtectedRoute roles={['farmer']}><DetailedFarmAnalytics /></ProtectedRoute>} />
-              <Route path="/farm-analytics" element={<ProtectedRoute roles={['farmer']}><DetailedFarmAnalytics /></ProtectedRoute>} />
+              <Route path="/farmer/passport/:farmId" element={<ProtectedRoute roles={['farmer']}><Suspense fallback={<RouteFallback />}><DetailedFarmAnalytics /></Suspense></ProtectedRoute>} />
+              <Route path="/farm-analytics" element={<ProtectedRoute roles={['farmer']}><Suspense fallback={<RouteFallback />}><DetailedFarmAnalytics /></Suspense></ProtectedRoute>} />
               <Route path="/farmer/wallet" element={<ProtectedRoute roles={['farmer']}><CarbonWallet /></ProtectedRoute>} />
               <Route path="/wallet" element={<ProtectedRoute roles={['farmer']}><CarbonWallet /></ProtectedRoute>} />
 
@@ -112,7 +116,7 @@ export default function App() {
               <Route path="/buyer/certificates/:certId" element={<ProtectedRoute roles={['buyer']}><CertificateRetirementPage /></ProtectedRoute>} />
 
               {/* Support */}
-              <Route path="/support" element={<SupportCenter />} />
+              <Route path="/support" element={<Suspense fallback={<RouteFallback />}><SupportCenter /></Suspense>} />
 
               {/* Catch-all */}
               <Route path="*" element={<Navigate to="/" replace />} />
