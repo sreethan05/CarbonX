@@ -1,5 +1,5 @@
-const PY = '/py-api';
-const BC = '/bc-api';
+const PY = import.meta.env.VITE_PY_API || '/py-api';
+const BC = import.meta.env.VITE_BC_API || '/bc-api';
 
 /** Thrown when the backend returns 401 Unauthorized (token missing/expired/invalid). */
 export class AuthError extends Error {
