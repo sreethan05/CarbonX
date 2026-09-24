@@ -84,7 +84,7 @@ export default function CorporateLogin() {
       });
       if (response.ok) {
         const data = await response.json();
-        login(data.token || 'cx_corp_token_' + Date.now(), {
+        await login(data.token, {
           c_id: data.c_id || 101,
           name: data.name || name,
           role: 'buyer'
@@ -97,18 +97,8 @@ export default function CorporateLogin() {
       console.warn('Backend corporate login API offline, using fallback auth', err);
     }
 
-    // Fallback simulated authentication
-    setTimeout(() => {
-      setIsVerifying(false);
-      const corporateUser = {
-        c_id: 101,
-        name: name,
-        role: 'buyer',
-        email: 'esg@telanganasustainable.com'
-      };
-      login('cx_corp_token_' + Date.now(), corporateUser);
-      navigate('/corporate/dashboard');
-    }, 600);
+    setError('Could not reach the corporate authentication service.');
+    setIsVerifying(false);
   };
 
   return (

@@ -60,6 +60,7 @@ export default function Layout({ children }) {
   const { user, logout, role, isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const navItems = ROLE_NAV[role] || ROLE_NAV.farmer;
   const roleMeta = ROLE_META[role] || ROLE_META.farmer;
@@ -72,7 +73,11 @@ export default function Layout({ children }) {
     location.pathname === '/' ||
     location.pathname === '/role-selection' ||
     location.pathname === '/farmer-register' ||
-    location.pathname === '/farmer-login';
+    location.pathname === '/farmer-login' ||
+    location.pathname === '/fpo/login' ||
+    location.pathname === '/fpo-login' ||
+    location.pathname === '/corporate/login' ||
+    location.pathname === '/corporate-login';
 
   const isActive = (path) => {
     if (location.pathname === path) return true;
@@ -82,9 +87,28 @@ export default function Layout({ children }) {
   };
 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  useEffect(() => { setShowAccountMenu(false); setShowNotifications(false); }, [location.pathname]);
+
+  useEffect(() => {
+    if (!showAccountMenu) return undefined;
+    const close = (e) => {
+      if (e.key === 'Escape') setShowAccountMenu(false);
+      else if (e.type === 'mousedown' && !e.target.closest?.('[data-account-menu]')) setShowAccountMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [showAccountMenu]);
 
   const goTo = (path) => { navigate(path); setSidebarOpen(false); };
-  const handleLogout = () => { logout(); navigate('/farmer-login'); };
+  // Logged-out users land back on the main dashboard (landing page).
+  const handleLogout = () => { logout(); setShowAccountMenu(false); navigate('/'); };
+
+  const dashboardPath = '/dashboard';
+  const walletPath = role === 'buyer' ? '/corporate/dashboard' : '/farmer/wallet';
 
   const renderNavItems = () => navItems.map((item) => {
     const active = isActive(item.path);
@@ -107,15 +131,16 @@ export default function Layout({ children }) {
 
   const renderUserBlock = () => (
     <div className="pt-3 border-t border-forest-100">
-      <div className="flex items-center gap-2.5 px-2 py-2">
-        <div className="w-9 h-9 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
+      <button onClick={() => goTo(dashboardPath)} title="Open my dashboard"
+        className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-forest-50 transition-colors text-left">
+        <div className="w-9 h-9 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full shrink-0">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
           {displayLocation && <p className="text-[10px] text-carbon-400 truncate">{displayLocation}</p>}
         </div>
-      </div>
+      </button>
     </div>
   );
 
@@ -170,17 +195,52 @@ export default function Layout({ children }) {
           )}
 
           {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-forest-100 flex items-center justify-center text-xs font-bold text-forest-800 rounded-full">
-                {initials}
+            <div className="relative" data-account-menu>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setShowAccountMenu(!showAccountMenu); setShowNotifications(false); }}
+                  title="Account"
+                  className={`w-8 h-8 flex items-center justify-center text-xs font-bold rounded-full transition-colors ${showAccountMenu ? 'bg-forest-800 text-white' : 'bg-forest-100 text-forest-800 hover:bg-forest-200'}`}
+                >
+                  {initials}
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-rose-50 rounded-xl text-carbon-600 hover:text-rose-600 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut size={18} />
+                </button>
               </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 hover:bg-rose-50 rounded-xl text-carbon-600 hover:text-rose-600 transition-colors"
-                title="Logout"
-              >
-                <LogOut size={18} />
-              </button>
+              {showAccountMenu && (
+                <div className="absolute right-0 top-10 z-50 w-60 bg-white border border-forest-100 rounded-2xl shadow-xl p-2">
+                  <div className="px-3 py-2.5 border-b border-forest-50 mb-1">
+                    <p className="text-xs font-bold text-carbon-800 truncate">{displayName}</p>
+                    {displayLocation && <p className="text-[10px] text-carbon-400 truncate">{displayLocation}</p>}
+                    <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide ${roleMeta.classes}`}>
+                      {roleMeta.label}
+                    </span>
+                  </div>
+                  <button onClick={() => goTo(dashboardPath)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-carbon-700 hover:bg-forest-50 transition-colors">
+                    <Home size={16} className="text-carbon-400" /><span>My Dashboard</span>
+                  </button>
+                  <button onClick={() => goTo(walletPath)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-carbon-700 hover:bg-forest-50 transition-colors">
+                    <Wallet size={16} className="text-carbon-400" /><span>Wallet</span>
+                  </button>
+                  <button onClick={() => goTo('/support')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-carbon-700 hover:bg-forest-50 transition-colors">
+                    <ClipboardList size={16} className="text-carbon-400" /><span>Support</span>
+                  </button>
+                  <div className="border-t border-forest-50 mt-1 pt-1">
+                    <button onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
+                      <LogOut size={16} /><span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <button

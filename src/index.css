@@ -125,3 +125,18 @@
 .upi-badge {
   background: linear-gradient(135deg, #0288D1 0%, #00bcd4 100%);
 }
+
+/* Leaflet parcel label: permanent place tag on the farm polygon */
+.leaflet-tooltip.parcel-label {
+  background: rgba(27, 67, 50, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  border-radius: 8px;
+  padding: 3px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.leaflet-tooltip.parcel-label::before {
+  display: none;
+}

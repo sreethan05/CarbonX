@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getMe } from '../services/api';
+import { getMe, AuthError } from '../services/api';
 
 const AuthContext = createContext(null);
+
+function normalizeRole(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['fpo officer', 'fpo/cooperative', 'cooperative'].includes(normalized)) return 'fpo';
+  if (['corporate', 'corporate buyer'].includes(normalized)) return 'buyer';
+  return ['farmer', 'fpo', 'verifier', 'admin', 'buyer'].includes(normalized) ? normalized : 'farmer';
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -15,10 +22,18 @@ export function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('carbonx_kyc') || 'null'); } catch { return null; }
   });
   const [loading, setLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     if (token) refreshUser();
   }, [token]);
+
+  function _clearStorage() {
+    localStorage.removeItem('carbonx_token');
+    localStorage.removeItem('carbonx_user');
+    localStorage.removeItem('carbonx_farms');
+    localStorage.removeItem('carbonx_kyc');
+  }
 
   async function refreshUser() {
     try {
@@ -36,13 +51,24 @@ export function AuthProvider({ children }) {
         }
       }
     } catch (e) {
-      console.warn('Could not refresh user:', e);
+      if (e instanceof AuthError) {
+        // Token is expired or invalid — clear everything and show a message
+        _clearStorage();
+        setToken(null);
+        setUser(null);
+        setFarms([]);
+        setKyc(null);
+        setSessionExpired(true);
+      } else {
+        console.warn('Could not refresh user:', e);
+      }
     } finally {
       setLoading(false);
     }
   }
 
   async function login(tokenValue, userData) {
+    setSessionExpired(false);
     setToken(tokenValue);
     setUser(userData);
     localStorage.setItem('carbonx_token', tokenValue);
@@ -63,8 +89,17 @@ export function AuthProvider({ children }) {
           localStorage.setItem('carbonx_lang', data.user.preferred_language);
         }
       }
-    } catch {
-      /* keep local user */
+    } catch (e) {
+      if (e instanceof AuthError) {
+        _clearStorage();
+        setToken(null);
+        setUser(null);
+        setFarms([]);
+        setKyc(null);
+        setSessionExpired(true);
+      } else {
+        // Keep the locally cached user when the backend is temporarily unavailable.
+      }
     }
   }
 
@@ -73,10 +108,8 @@ export function AuthProvider({ children }) {
     setUser(null);
     setFarms([]);
     setKyc(null);
-    localStorage.removeItem('carbonx_token');
-    localStorage.removeItem('carbonx_user');
-    localStorage.removeItem('carbonx_farms');
-    localStorage.removeItem('carbonx_kyc');
+    setSessionExpired(false);
+    _clearStorage();
   }
 
   function addFarm(farm) {
@@ -90,13 +123,17 @@ export function AuthProvider({ children }) {
     localStorage.setItem('carbonx_user', JSON.stringify(profile));
   }
 
-  const role = user?.role || 'farmer';
+  function clearSessionExpired() {
+    setSessionExpired(false);
+  }
+
+  const role = normalizeRole(user?.role);
   const isAuthenticated = !!token && !!user;
 
   return (
     <AuthContext.Provider value={{
-      user, token, farms, kyc, role, isAuthenticated, loading,
-      login, logout, addFarm, refreshUser, setUserProfile,
+      user, token, farms, kyc, role, isAuthenticated, loading, sessionExpired,
+      login, logout, addFarm, refreshUser, setUserProfile, clearSessionExpired,
     }}>
       {children}
     </AuthContext.Provider>

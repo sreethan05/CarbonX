@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Marketplace() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isBuyer = role === 'buyer';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [quantities, setQuantities] = useState({});
@@ -95,6 +96,11 @@ export default function Marketplace() {
   });
 
   const handleBuyClick = (item) => {
+    // Purchasing requires a company (buyer) account — farmers browse and sell here.
+    if (!isBuyer) {
+      navigate('/corporate/login');
+      return;
+    }
     setCheckoutModalItem(item);
     setPaymentSuccess(false);
   };
@@ -118,36 +124,73 @@ export default function Marketplace() {
 
         {/* Header & Search Bar */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+            <div className="min-w-0">
               <h1 className="text-2xl font-extrabold text-[#0F172A] font-manrope">Carbon Credit Marketplace</h1>
               <p className="text-xs text-slate-500 mt-0.5">Direct agricultural carbon offset procurement from verified Telangana farms.</p>
+              {!isBuyer && (
+                <p className="text-[11px] text-slate-500 mt-1.5 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                  Browsing{user?.name ? ` as ${user.name}` : ''} — purchasing needs a company account.{' '}
+                  <button onClick={() => navigate('/corporate/login')} className="font-bold text-emerald-800 hover:underline">
+                    Continue as Company →
+                  </button>
+                </p>
+              )}
             </div>
 
             <button
-              onClick={() => navigate('/marketplace/checkout')}
-              className="px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+              onClick={() => navigate(isBuyer ? '/marketplace/checkout' : '/corporate/login')}
+              className="w-full sm:w-auto shrink-0 px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
             >
               <ShoppingCart className="w-4 h-4 text-emerald-300" />
-              <span>Bulk Auto-Match Engine</span>
+              <span className="whitespace-nowrap">Bulk Auto-Match Engine</span>
             </button>
           </div>
 
           {/* Full-width clean white search bar */}
           <div className="relative w-full">
-            <Search className="w-5 h-5 text-slate-400 absolute left-5 top-4" />
+            <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search by crop or location..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-13 pr-6 py-3.5 bg-white border border-slate-200 rounded-full text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-600 font-medium"
+              className="w-full pl-11 pr-11 py-3.5 bg-white border border-slate-200 rounded-full text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-600 font-medium placeholder:text-slate-400"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
+          <p className="text-[11px] text-slate-500">
+            {filteredListings.length} listing{filteredListings.length === 1 ? '' : 's'}
+            {searchQuery && <> matching “{searchQuery}”</>}
+          </p>
         </div>
 
         {/* Listing Cards Stack */}
         <div className="space-y-4">
+          {filteredListings.length === 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
+              <Search className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm font-bold text-slate-800">No listings found</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Nothing matches “{searchQuery}”. Try a crop (Paddy, Cotton) or a location (Chevella, Warangal).
+              </p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-4 px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all"
+              >
+                Clear Search
+              </button>
+            </div>
+          )}
           {filteredListings.map(item => {
             const qty = getQuantity(item.id);
             return (

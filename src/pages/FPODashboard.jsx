@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2, Users, FileText, AlertTriangle, CheckCircle2, XCircle, Search,
-  PlusCircle, Download, ExternalLink, Shield, Layers, Filter, Check, X, RefreshCw
+  PlusCircle, Download, ExternalLink, Shield, Layers, Filter, Check, X, RefreshCw, Loader2
 } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
+import { getFpoFarms, confirmFpoFarm, reviewFpoFarm } from '../services/api';
 
 export default function FPODashboard() {
   const navigate = useNavigate();
@@ -43,11 +44,51 @@ export default function FPODashboard() {
     { id: 'F-005', name: 'S. Yadaiah', phone: '9876543214', survey: '201/C', acres: 4.00, badge: 'FPO', credits: 20.0, status: 'VERIFIED' }
   ]);
 
-  // Tab 3: Pending Queue
-  const [pendingQueue, setPendingQueue] = useState([
-    { id: 'P-101', name: 'G. Mallesh', phone: '9876543215', village: 'Pochampally', survey: '90/A', acres: 1.5, date: '2026-09-08' },
-    { id: 'P-102', name: 'T. Swapna', phone: '9876543216', village: 'Mothkur', survey: '33/C', acres: 2.8, date: '2026-09-09' }
-  ]);
+  // Tab 3: Pending Queue (live: GET /fpo/farms?status=PENDING — Tier 3 confirm)
+  const [pendingQueue, setPendingQueue] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState('');
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // Tab 4: Flagged audit (live: GET /fpo/farms?status=FLAGGED — Tier 3 review)
+  const [flaggedFarms, setFlaggedFarms] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState('');
+  const [auditAction, setAuditAction] = useState(null);
+
+  async function loadPending() {
+    setPendingLoading(true);
+    setPendingError('');
+    try {
+      const res = await getFpoFarms('PENDING');
+      if (res.success) setPendingQueue(res.farms || []);
+      else setPendingError(res.message || 'Could not load pending queue.');
+    } catch {
+      setPendingError('Could not reach the FPO review service.');
+    } finally {
+      setPendingLoading(false);
+    }
+  }
+
+  async function loadFlagged() {
+    setAuditLoading(true);
+    setAuditError('');
+    try {
+      const res = await getFpoFarms('FLAGGED');
+      if (res.success) setFlaggedFarms(res.farms || []);
+      else setAuditError(res.message || 'Could not load flagged farms.');
+    } catch {
+      setAuditError('Could not reach the FPO review service.');
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'pending') loadPending();
+    if (activeTab === 'audit') loadFlagged();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const handleOnboardSubmit = (e) => {
     e.preventDefault();
@@ -70,29 +111,48 @@ export default function FPODashboard() {
     setTimeout(() => setOnboardSuccess(false), 4000);
   };
 
-  const handleApprovePending = (id) => {
-    const item = pendingQueue.find(p => p.id === id);
-    if (item) {
-      setFarmersList([
-        { id: `F-${Date.now()}`, name: item.name, phone: item.phone, survey: item.survey, acres: item.acres, badge: 'FPO', credits: item.acres * 5.0, status: 'VERIFIED' },
-        ...farmersList
-      ]);
-      setPendingQueue(pendingQueue.filter(p => p.id !== id));
+  const handleApprovePending = async (id) => {
+    setPendingAction(id);
+    try {
+      const res = await confirmFpoFarm(id);
+      if (res.success) await loadPending();
+      else setPendingError(res.message || 'Confirm failed.');
+    } catch {
+      setPendingError('Could not reach the FPO review service.');
+    } finally {
+      setPendingAction(null);
     }
   };
 
-  const handleRejectPending = (id) => {
-    setPendingQueue(pendingQueue.filter(p => p.id !== id));
+  const handleRejectPending = async (id) => {
+    setPendingAction(id);
+    try {
+      const res = await reviewFpoFarm(id, 'reject', 'Rejected from pending queue');
+      if (res.success) await loadPending();
+      else setPendingError(res.message || 'Reject failed.');
+    } catch {
+      setPendingError('Could not reach the FPO review service.');
+    } finally {
+      setPendingAction(null);
+    }
   };
 
-  const handleAuditApprove = () => {
-    setFarmersList(farmersList.map(f => f.name === 'Padma Bai' ? { ...f, badge: 'FPO', status: 'VERIFIED', credits: 11.0 } : f));
-    setAuditActionDone('APPROVED_FPO');
-  };
-
-  const handleAuditReject = () => {
-    setFarmersList(farmersList.map(f => f.name === 'Padma Bai' ? { ...f, badge: 'PENDING', status: 'BLOCKED' } : f));
-    setAuditActionDone('REJECTED');
+  const handleAuditDecision = async (id, action) => {
+    setAuditAction(id + action);
+    try {
+      const res = await reviewFpoFarm(id, action, auditNotes);
+      if (res.success) {
+        setAuditActionDone(action === 'approve' ? 'APPROVED_FPO' : 'REJECTED');
+        setAuditNotes('');
+        await loadFlagged();
+      } else {
+        setAuditError(res.message || 'Review failed.');
+      }
+    } catch {
+      setAuditError('Could not reach the FPO review service.');
+    } finally {
+      setAuditAction(null);
+    }
   };
 
   const filteredFarmers = farmersList.filter(f => {
@@ -383,7 +443,13 @@ export default function FPODashboard() {
               <p className="text-xs text-agriText-muted">Review self-registered farmers awaiting FPO cooperative confirmation.</p>
             </div>
 
-            {pendingQueue.length === 0 ? (
+            {pendingLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            ) : pendingError ? (
+              <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-center">{pendingError}</p>
+            ) : pendingQueue.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-forest-200 rounded-2xl">
                 <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
                 <p className="text-sm font-bold text-carbon-900">Queue Cleared</p>
@@ -400,21 +466,23 @@ export default function FPODashboard() {
                         <VerificationBadge badge="PENDING" size="sm" />
                       </div>
                       <p className="text-xs text-agriText-muted mt-1">
-                        Phone: {p.phone} | Village: {p.village} | Survey: {p.survey} | Area: {p.acres} Acres
+                        Farmer: {p.owner_name || p.owner_phone} | Phone: {p.owner_phone} | {p.village ? `Village: ${p.village} | ` : ''}Area: {p.area_hectares} ha | Crop: {p.crop_type || '—'}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
                       <button
                         onClick={() => handleApprovePending(p.id)}
-                        className="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                        disabled={pendingAction === p.id}
+                        className="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
                       >
                         <Check className="w-4 h-4" />
-                        <span>Approve under FPO Badge</span>
+                        <span>{pendingAction === p.id ? 'Working...' : 'Approve under FPO Badge'}</span>
                       </button>
                       <button
                         onClick={() => handleRejectPending(p.id)}
-                        className="flex-1 md:flex-none px-4 py-2 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                        disabled={pendingAction === p.id}
+                        className="flex-1 md:flex-none px-4 py-2 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
                         <X className="w-4 h-4" />
                         <span>Reject</span>
@@ -427,74 +495,88 @@ export default function FPODashboard() {
           </div>
         )}
 
-        {/* TAB 4: FLAGGED REVIEWS (PADMA BAI) */}
+        {/* TAB 4: FLAGGED REVIEWS (live Tier 3 review desk) */}
         {activeTab === 'audit' && (
           <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-6">
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  Ground-Truth Audit Inspector
+                  Ground-Truth Audit Inspector (Tier 3)
                 </span>
-                <h2 className="text-lg font-bold text-carbon-900 mt-1">Flagged Review : Padma Bai (Survey 124/B)</h2>
-                <p className="text-xs text-agriText-muted">PostGIS Spatial Boundary Discrepancy Review Desk</p>
+                <h2 className="text-lg font-bold text-carbon-900 mt-1">Flagged Farm Reviews</h2>
+                <p className="text-xs text-agriText-muted">Approve under FPO badge or reject & block — writes to the live review ledger.</p>
               </div>
-
-              <VerificationBadge badge="PENDING" size="lg" />
+              <button onClick={loadFlagged} className="p-2 hover:bg-surface-sage rounded-lg" title="Refresh">
+                <RefreshCw className={`w-4 h-4 ${auditLoading ? 'animate-spin' : ''}`} />
+              </button>
             </div>
 
-            {auditActionDone ? (
+            {auditActionDone && (
               <div className={`p-4 rounded-xl border text-xs flex items-center gap-3 ${
                 auditActionDone === 'APPROVED_FPO' ? 'bg-surface-sage border border-forest-200 text-primary' : 'bg-red-50 border border-red-200 text-red-900'
               }`}>
                 <CheckCircle2 className="w-5 h-5" />
                 <span className="font-semibold">
                   {auditActionDone === 'APPROVED_FPO'
-                    ? 'Audit Action: Approved under FPO Attestation Badge (₹300 benchmark rate).'
+                    ? 'Audit Action: Approved under FPO Attestation Badge.'
                     : 'Audit Action: Farm flagged & blocked from credit earning.'}
                 </span>
               </div>
-            ) : null}
+            )}
 
-            {/* Audit Warning Banner */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900 text-xs flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">PostGIS Spatial Variance Flagged</p>
-                <p className="mt-0.5 text-amber-800">
-                  ST_Intersects boundary collision detected with neighboring survey parcel 124/A (K. Ramesh). Document area: 2.20 Acres vs Polygon area: 2.85 Acres (29.5% area discrepancy exceeds ±20% tolerance).
-                </p>
+            {auditLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
               </div>
-            </div>
-
-            {/* Audit Notes & Control Panel */}
-            <div className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-bold text-carbon-900">FPO Ground-Truth Field Audit Notes</h3>
-              <textarea
-                rows={2}
-                placeholder="Enter physical field inspection notes..."
-                value={auditNotes}
-                onChange={e => setAuditNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-forest-200 rounded-xl text-xs text-carbon-900 focus:outline-none"
-              />
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleAuditApprove}
-                  className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Approve under FPO Badge (₹300)</span>
-                </button>
-
-                <button
-                  onClick={handleAuditReject}
-                  className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
-                >
-                  <X className="w-4 h-4" />
-                  <span>Reject & Block</span>
-                </button>
+            ) : auditError ? (
+              <p className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-center">{auditError}</p>
+            ) : flaggedFarms.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-forest-200 rounded-2xl">
+                <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
+                <p className="text-sm font-bold text-carbon-900">No Flagged Farms</p>
+                <p className="text-xs text-agriText-muted">Area mismatches and unclear documents will appear here.</p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                {flaggedFarms.map(f => (
+                  <div key={f.id} className="bg-amber-50/50 border border-amber-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-xs font-mono font-bold text-agriText-subtle">{String(f.id).slice(0, 8)}</span>
+                      <h3 className="text-sm font-bold text-carbon-900">{f.name}</h3>
+                      <VerificationBadge badge="FLAGGED" size="sm" />
+                    </div>
+                    <p className="text-xs text-agriText-muted">
+                      Farmer: {f.owner_name || f.owner_phone} | Phone: {f.owner_phone} | {f.village ? `Village: ${f.village} | ` : ''}Area: {f.area_hectares} ha | Crop: {f.crop_type || '—'}
+                    </p>
+                    <textarea
+                      rows={2}
+                      placeholder="Enter physical field inspection notes..."
+                      value={auditNotes}
+                      onChange={e => setAuditNotes(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-forest-200 rounded-xl text-xs text-carbon-900 focus:outline-none"
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleAuditDecision(f.id, 'approve')}
+                        disabled={auditAction === f.id + 'approve'}
+                        className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>{auditAction === f.id + 'approve' ? 'Working...' : 'Approve under FPO Badge'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleAuditDecision(f.id, 'reject')}
+                        disabled={auditAction === f.id + 'reject'}
+                        className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>{auditAction === f.id + 'reject' ? 'Working...' : 'Reject & Block'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

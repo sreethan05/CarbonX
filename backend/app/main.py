@@ -18,8 +18,8 @@ import re
 from datetime import datetime, timedelta, timezone
 import os
 
-from app.security import create_access_token, get_current_user, require_role
-from app.phone_service import generate_otp, send_phone_otp
+from app.security import create_access_token, decode_token, get_current_user, require_role
+from app.phone_service import generate_otp, normalize_indian_mobile, send_phone_otp
 from app import supabase_db as db
 from app import redis_store
 from app import sample_data
@@ -46,7 +46,7 @@ except Exception as e:
 
 
 def _sms_ready() -> bool:
-    """True when Textplate SMS creds are set (token + template id)."""
+    """True when at least one SMS provider (Textplate or Twilio) is set."""
     try:
         from app.phone_service import sms_configured
 
@@ -55,9 +55,30 @@ def _sms_ready() -> bool:
         return False
 
 
-def _twilio_ready() -> bool:
-    """Kept for backwards compat (/health consumers). Now mirrors SMS status."""
-    return _sms_ready()
+def _sms_provider() -> str:
+    """Name of the configured SMS provider(s) for health reporting."""
+    try:
+        from app.phone_service import textplate_configured, twilio_configured
+
+        primary = textplate_configured()
+        fallback = twilio_configured()
+        if primary and fallback:
+            return "Textplate+Twilio"
+        if fallback:
+            return "Twilio"
+        return "Textplate"
+    except Exception:
+        return "Textplate"
+
+
+def _otp_dev_fallback_enabled() -> bool:
+    explicit = os.getenv("OTP_DEV_FALLBACK", "").strip().lower()
+    if explicit in {"1", "true", "yes", "on"}:
+        return True
+    if explicit in {"0", "false", "no", "off"}:
+        return False
+    env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).strip().lower()
+    return env not in {"prod", "production"}
 
 
 def _require_database():
@@ -98,6 +119,13 @@ def _verify_otp(phone: str, otp: str) -> bool:
 
 def _clear_otp(phone: str):
     redis_store.clear_otp(phone)
+
+
+def _normalize_phone_or_error(phone: str) -> str:
+    normalized = normalize_indian_mobile(phone)
+    if not normalized:
+        raise ValueError("Enter a valid 10-digit Indian mobile number")
+    return normalized
 
 
 def _polygon_area_hectares(geojson: dict) -> float:
@@ -149,6 +177,17 @@ class RegisterModel(BaseModel):
 class LoginOtpModel(BaseModel):
     phone: str
     otp: str
+
+
+class FpoLoginModel(BaseModel):
+    phone: str
+    fpo_name: str
+    otp: str
+
+
+class CorporateLoginModel(BaseModel):
+    name: str
+    password: str
 
 
 class RegistrationOtpVerifyModel(BaseModel):
@@ -233,6 +272,114 @@ from app.voice_agent.voice_routes import router as voice_router
 app.include_router(voice_router)
 
 
+class SupportChatMessage(BaseModel):
+    role: Optional[str] = "user"
+    text: Optional[str] = ""
+
+
+class SupportChatModel(BaseModel):
+    message: str
+    language: Optional[str] = "en"
+    history: Optional[list[SupportChatMessage]] = []
+
+
+SUPPORT_SYSTEM_PROMPT = (
+    "You are the CarbonX Support Assistant, helping Indian farmers and buyers use the CarbonX app. "
+    "Answer clearly in the user's language (English, Hindi, or Telugu). Keep answers short (under 120 words) "
+    "and practical, with steps when the user asks how to do something. "
+    "Never ask for or repeat Aadhaar numbers, OTPs, passwords, bank details, or UPI IDs."
+)
+
+SUPPORT_KNOWLEDGE = (
+    "CarbonX facts:\n"
+    "- CarbonX helps farmers earn carbon + biodiversity credits from their farms, sold to corporate buyers.\n"
+    "- Farmer login is phone + 6-digit OTP (no password). Roles: farmer, FPO officer, corporate buyer, admin.\n"
+    "- Land verification tiers: Tier 1A = survey matches govt registry with official boundary (auto-verified, locked map); "
+    "Tier 1B = registry record match, farmer draws boundary; Tier 2 = survey not in registry, upload Pahani/RoR 1B and draw boundary; "
+    "Tier 3 = FPO-attested. Ownership mismatches are rejected with Not Verified.\n"
+    "- Farm map: Tier 1A boundary is locked from the registry; other tiers draw/confirm the polygon. Area tolerance is 20%.\n"
+    "- Satellite: Sentinel-2 scans roughly every 5 days; NDVI measures crop health (-1 to 1, higher is healthier).\n"
+    "- Credits: carbon credits come from estimated carbon tonnes; biodiversity credits = biodiversity score / 40; "
+    "total = carbon + biodiversity. Benchmark prices: Tier 1A ~INR 340, 1B ~INR 320, Tier 2 ~INR 310, FPO ~INR 300 per credit.\n"
+    "- Marketplace: only VERIFIED farms with an eligible badge can list. PENDING/FLAGGED farms go to FPO review.\n"
+    "- Wallet/UPI: after a buyer purchases credits, payout goes to the farmer's registered UPI/bank account.\n"
+    "- KYC: Aadhaar + Pahani/land document; only the last 4 digits of Aadhaar are stored.\n"
+    "- Key pages: Dashboard (/farmer/dashboard), Land Verification (/farmer/land-verification), "
+    "Map (/farm-map), Wallet (/farmer/wallet), Marketplace (/marketplace).\n"
+    "- Farmer Helpline: 1800-420-2026 (toll-free, 9 AM - 9 PM IST).\n"
+    "If a question is unrelated to CarbonX, farming, or carbon credits, say briefly what you can help with."
+)
+
+SUPPORT_FALLBACK_REPLIES = (
+    ("map", 'You can map your farm from your dashboard: open Land Verification, verify your survey number, then draw the boundary on the satellite map. The area is calculated automatically.'),
+    ("scan", 'Sentinel-2 satellites rescan roughly every 5 days. Updated NDVI values appear on your farm analytics page.'),
+    ("credit", 'Carbon credits come from your farm NDVI, area, and crop type. Total credits = carbon tonnes + biodiversity score / 40. Only VERIFIED farms with an eligible badge can list on the marketplace.'),
+    ("ndvi", 'NDVI (Normalized Difference Vegetation Index) measures crop health from satellite imagery, from -1 to 1. Higher means healthier crops.'),
+    ("upi", 'After a buyer purchases your credits, the payout goes to your registered UPI/bank account. Check your wallet page for status.'),
+    ("payout", 'After a buyer purchases your credits, the payout goes to your registered UPI/bank account. Check your wallet page for status.'),
+    ("kyc", 'KYC needs your Aadhaar and a Pahani/land document. Only the last 4 digits of Aadhaar are stored. Ownership mismatches are rejected as Not Verified.'),
+    ("otp", 'Farmer login uses phone + 6-digit OTP. Enter your 10-digit mobile number, tap Send OTP, then enter the code.'),
+    ("fpo", 'Pending or flagged parcels are reviewed by your FPO coordinator, who can confirm or reject them from the FPO dashboard.'),
+)
+
+
+def _support_fallback_reply(text: str) -> str:
+    lowered = (text or '').lower()
+    for keyword, reply in SUPPORT_FALLBACK_REPLIES:
+        if keyword in lowered:
+            return reply
+    return ('I can help with farm mapping, land verification tiers, satellite scans, carbon credits, '
+            'UPI payouts, KYC, OTP login, and FPO review. What would you like to know?')
+
+
+@app.post("/support/chat")
+def support_chat(data: SupportChatModel):
+    """Public support chatbot, powered by the configured chat LLM (Sarvam).
+
+    No account data is used here — generic CarbonX help only. Falls back to
+    built-in answers when the LLM is unavailable so the page never breaks.
+    """
+    message = (data.message or '').strip()[:500]
+    if not message:
+        return {"success": False, "message": "Type your question first."}
+    lang = (data.language or 'en')[:2].lower()
+    if lang not in ('en', 'hi', 'te'):
+        lang = 'en'
+
+    api_key = os.getenv("SARVAM_API_KEY", "").strip()
+    if api_key:
+        try:
+            import httpx
+
+            lang_name = {'en': 'English', 'hi': 'Hindi', 'te': 'Telugu'}[lang]
+            history = []
+            for item in (data.history or [])[-6:]:
+                role = 'user' if (item.role or 'user') == 'user' else 'assistant'
+                content = (item.text or '').strip()[:500]
+                if content:
+                    history.append({"role": role, "content": content})
+            resp = httpx.post(
+                "https://api.sarvam.ai/v1/chat/completions",
+                headers={"api-subscription-key": api_key, "Content-Type": "application/json"},
+                json={
+                    "model": os.getenv("SARVAM_CHAT_MODEL", "sarvam-105b-conversations"),
+                    "messages": [
+                        {"role": "system", "content": SUPPORT_SYSTEM_PROMPT + "\n" + SUPPORT_KNOWLEDGE},
+                        *history,
+                        {"role": "user", "content": f"Reply in {lang_name}: {message}"},
+                    ],
+                },
+                timeout=25.0,
+            )
+            resp.raise_for_status()
+            reply = ((resp.json().get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+            if reply:
+                return {"success": True, "reply": reply[:1200], "source": "llm"}
+        except Exception as exc:
+            print(f"support chat LLM unavailable: {exc}")
+    return {"success": True, "reply": _support_fallback_reply(message), "source": "fallback"}
+
+
 def _user_response(user: dict, phone: str):
     return {
         "phone": phone,
@@ -251,15 +398,41 @@ def _user_response(user: dict, phone: str):
 
 def _send_otp_flow(phone: str):
     otp = generate_otp()
-    _store_otp(phone, otp)
-    sms_sent = send_phone_otp(phone, otp)
+    result = send_phone_otp(phone, otp)
+    # send_phone_otp returns (sent, info): info is provider name on
+    # success, error detail on failure. Tolerate legacy bool.
+    if isinstance(result, tuple):
+        sms_sent, info = result
+    else:
+        sms_sent, info = bool(result), None
     if sms_sent:
-        return {"success": True, "message": "OTP sent to your phone via SMS"}
-    # SMS provider configured but send failed -> do NOT leak OTP.
+        _store_otp(phone, otp)
+        provider = info if info in ("textplate", "twilio") else "SMS"
+        return {"success": True, "message": f"OTP sent to your phone via {provider}"}
+    # A provider is configured but delivery failed (bad token/template,
+    # no credits, network). Do NOT leak OTP — return actionable error.
     if _sms_ready():
-        return {"success": False, "message": "Failed to send OTP SMS. Please retry."}
+        _clear_otp(phone)
+        detail = f" ({info})" if info else ""
+        if _otp_dev_fallback_enabled():
+            _store_otp(phone, otp)
+            return {
+                "success": True,
+                "message": f"OTP generated (SMS delivery failed{detail} - dev fallback)",
+                "dev_otp": otp,
+                "sms_warning": f"SMS delivery failed{detail}. Using local OTP fallback.",
+            }
+        return {
+            "success": False,
+            "message": f"SMS delivery failed{detail}. Check Textplate credits/token/template and Twilio fallback credentials.",
+        }
     # Dev mode (no Textplate creds): expose OTP for local testing only.
-    return {"success": True, "message": "OTP generated (dev mode)", "dev_otp": otp}
+    _store_otp(phone, otp)
+    return {
+        "success": True,
+        "message": "OTP generated (SMS unavailable — dev mode)",
+        "dev_otp": otp,
+    }
 
 
 def _decode_upload(content: str) -> bytes:
@@ -310,6 +483,36 @@ def _pahani_fallback_fields(text: str) -> dict:
     }
 
 
+def _normalize_text(value: Optional[str]) -> str:
+    return re.sub(r"\s+", " ", (value or "")).strip().lower()
+
+
+def _verify_land_document_evidence(pahani_fields: dict, pahani_text: str, extracted_text: str = "") -> tuple[bool, str]:
+    """Reject uploads that do not look like a valid land record."""
+    combined = f"{pahani_text} {extracted_text or ''}".strip()
+    combined_normalized = _normalize_text(combined)
+    land_keywords = (
+        "patta", "pattadar", "pahani", "adangal", "7/12", "survey no", "survey number",
+        "land revenue", "khata", "khasra", "dharani", "meeseva", "bhulekh", "jamabandi",
+        "ror", "chitta", "khatian", "ownership", "deed", "district", "village", "mandal"
+    )
+
+    has_keyword_signal = any(keyword in combined_normalized for keyword in land_keywords)
+    has_survey = bool((pahani_fields.get("survey_no") or "").strip())
+    has_owner = bool((pahani_fields.get("pattadar_name") or "").strip())
+    has_location = bool((pahani_fields.get("district") or "").strip() or (pahani_fields.get("village") or "").strip())
+
+    if not (has_keyword_signal or has_survey or has_owner or has_location):
+        return False, "This document does not look like a valid land record. Please upload a Pahani / 7/12 / Patta document."
+    if not has_survey:
+        return False, "The uploaded document is missing the survey number. Please upload a valid land record."
+    if not has_owner:
+        return False, "The uploaded document is missing the pattadar/owner name. Please upload a valid land record."
+    if not has_location:
+        return False, "The uploaded document is missing the district or village details. Please upload a valid land record."
+    return True, ""
+
+
 def _parse_pahani_upload(content_base64: str, filename: str, content_type: str) -> tuple[dict, str]:
     """Use the existing Azure + Pahani parser, with installed Tesseract as fallback."""
     from app.services.document_intelligence_service import analyze_document_bytes, validate_upload
@@ -335,7 +538,6 @@ def root():
         "version": "5.0",
         "supabase": db.is_ready(),
         "sms": _sms_ready(),
-        "twilio": _twilio_ready(),
         "earth_engine": earth_engine_ready,
     }
 
@@ -346,8 +548,7 @@ def health():
     return {
         "success": database["ready"],
         "database": database,
-        "sms": {"ready": _sms_ready(), "provider": "Textplate"},
-        "twilio": {"ready": _twilio_ready(), "provider": "Textplate"},
+        "sms": {"ready": _sms_ready(), "provider": _sms_provider()},
         "earth_engine": {"ready": earth_engine_ready},
     }
 
@@ -355,10 +556,10 @@ def health():
 @app.post("/send-otp")
 def send_otp(data: SendOtpModel):
     try:
-        phone = data.phone.strip().replace(" ", "")
-        if len(phone) != 10 or not phone.isdigit():
-            return {"success": False, "message": "Enter a valid 10-digit phone number"}
+        phone = _normalize_phone_or_error(data.phone)
         return _send_otp_flow(phone)
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
     except HTTPException:
         raise
     except Exception as e:
@@ -368,10 +569,8 @@ def send_otp(data: SendOtpModel):
 @app.post("/register/verify-otp")
 def verify_registration_otp(data: RegistrationOtpVerifyModel):
     try:
-        phone = data.phone.strip().replace(" ", "")
+        phone = _normalize_phone_or_error(data.phone)
         otp = data.otp.strip()
-        if len(phone) != 10 or not phone.isdigit():
-            return {"success": False, "message": "Enter a valid 10-digit phone number"}
         if len(otp) != 6 or not otp.isdigit():
             return {"success": False, "message": "Enter the complete 6-digit OTP"}
         if not _verify_otp(phone, otp):
@@ -389,6 +588,8 @@ def verify_registration_otp(data: RegistrationOtpVerifyModel):
             "message": "OTP verified",
             "verification_token": verification_token,
         }
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
     except HTTPException:
         raise
     except Exception as e:
@@ -398,7 +599,7 @@ def verify_registration_otp(data: RegistrationOtpVerifyModel):
 @app.post("/register")
 def register(data: RegisterModel):
     try:
-        phone = data.phone.strip().replace(" ", "")
+        phone = _normalize_phone_or_error(data.phone)
         if not validate_aadhaar(data.aadhaar):
             return {"success": False, "message": "Enter a valid 12-digit Aadhaar number"}
         token_payload = decode_token(data.otp_verification_token) if data.otp_verification_token else None
@@ -456,6 +657,8 @@ def register(data: RegisterModel):
             "token": token,
             "user": _user_response(user, phone),
         }
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
     except HTTPException:
         raise
     except Exception as e:
@@ -465,7 +668,7 @@ def register(data: RegisterModel):
 @app.post("/login/send-otp")
 def login_send_otp(data: SendOtpModel):
     try:
-        phone = data.phone.strip().replace(" ", "")
+        phone = _normalize_phone_or_error(data.phone)
         existing = _get_user(phone)
         if not existing:
             return {"success": False, "message": "Phone not registered. Please sign up first."}
@@ -473,6 +676,8 @@ def login_send_otp(data: SendOtpModel):
         if result.get("success"):
             result["message"] = "OTP sent"
         return result
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
     except HTTPException:
         raise
     except Exception as e:
@@ -482,7 +687,7 @@ def login_send_otp(data: SendOtpModel):
 @app.post("/login")
 def login(data: LoginOtpModel):
     try:
-        phone = data.phone.strip().replace(" ", "")
+        phone = _normalize_phone_or_error(data.phone)
         if not _verify_otp(phone, data.otp):
             return {"success": False, "message": "Invalid or expired OTP"}
         user = _get_user(phone)
@@ -490,10 +695,64 @@ def login(data: LoginOtpModel):
             return {"success": False, "message": "Phone not registered"}
         token = create_access_token({"phone": phone, "name": user.get("name", ""), "role": user.get("role", "farmer")})
         return {"success": True, "token": token, "user": _user_response(user, phone)}
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
     except HTTPException:
         raise
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@app.post("/fpo/login")
+def fpo_login(data: FpoLoginModel):
+    try:
+        phone = _normalize_phone_or_error(data.phone)
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
+    fpo_name = data.fpo_name.strip()
+    if not fpo_name:
+        return {"success": False, "message": "Select an FPO or cooperative"}
+    otp = data.otp.strip()
+    if len(otp) != 6 or not otp.isdigit():
+        return {"success": False, "message": "Enter the complete 6-digit OTP"}
+    if not _verify_otp(phone, otp):
+        return {"success": False, "message": "Invalid or expired OTP"}
+
+    user = {
+        "phone": phone,
+        "name": "FPO Officer",
+        "fpo_name": fpo_name,
+        "district": (
+            "Yadadri Bhuvanagiri"
+            if "Mothkur" in fpo_name
+            else "Warangal"
+            if "Wardhannapet" in fpo_name
+            else "Jangaon"
+        ),
+        "role": "fpo",
+    }
+    token = create_access_token(
+        {"phone": phone, "name": user["name"], "role": user["role"], "fpo_name": fpo_name}
+    )
+    return {"success": True, "token": token, "user": user}
+
+
+@app.post("/corporate/login")
+def corporate_login(data: CorporateLoginModel):
+    name = data.name.strip()
+    if not name or not data.password:
+        return {"success": False, "message": "Corporate name and password are required"}
+    if data.password != os.getenv("CORPORATE_DEMO_PASSWORD", "Corporate@2026"):
+        return {"success": False, "message": "Invalid corporate credentials"}
+
+    user = {
+        "c_id": 101,
+        "name": name,
+        "email": "esg@telanganasustainable.com",
+        "role": "buyer",
+    }
+    token = create_access_token({"name": name, "role": "buyer", "c_id": user["c_id"]})
+    return {"success": True, "token": token, **user}
 
 
 def _claimed_area_ha(data: LandVerificationModel) -> Optional[float]:
@@ -518,7 +777,7 @@ def _patch_farm(farm_id: Optional[str], fields: dict):
             return None
 
 
-@app.get("/land/registry/{survey}")
+@app.get("/land/registry/{survey:path}")
 def land_registry_lookup(survey: str, current_user: dict = Depends(get_current_user)):
     """Look up a survey number in the Supabase land_registry mock table."""
     from app.services.registry_service import lookup_survey
@@ -702,6 +961,14 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             data.document_name or "pahani.jpg",
             data.document_content_type or "image/jpeg",
         )
+        land_ok, land_message = _verify_land_document_evidence(
+            pahani_fields,
+            pahani_text,
+            data.extracted_text or "",
+        )
+        if not land_ok:
+            return {"success": False, "message": land_message}
+
         survey_number = pahani_fields.get("survey_no") or data.survey_number or ""
         village = pahani_fields.get("village") or village
         district = pahani_fields.get("district") or district
@@ -731,8 +998,12 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
         registered_last4 = str(profile.get("aadhaar_last4") or "")[-4:]
         _name_score, name_ok = _match_name(profile.get("name", ""), document_owner or ocr_text)
         aadhaar_ok = bool(document_aadhaar and registered_last4 and document_aadhaar[-4:] == registered_last4)
-        village_ok = bool(pahani_fields.get("village") and profile.get("village") and pahani_fields["village"].strip().lower() == profile["village"].strip().lower())
-        district_ok = bool(pahani_fields.get("district") and profile.get("district") and pahani_fields["district"].strip().lower() == profile["district"].strip().lower())
+        profile_village = _normalize_text(profile.get("village") or "")
+        profile_district = _normalize_text(profile.get("district") or "")
+        document_village = _normalize_text(pahani_fields.get("village") or "")
+        document_district = _normalize_text(pahani_fields.get("district") or "")
+        village_ok = bool(profile_village and document_village and profile_village == document_village)
+        district_ok = bool(profile_district and document_district and profile_district == document_district)
         three_way_failures = []
         if not name_ok:
             three_way_failures.append("pahani_owner_name_mismatch")
@@ -762,6 +1033,10 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
         )
         if three_way_failures:
             fraud["failed_checks"] = list(dict.fromkeys([*fraud.get("failed_checks", []), *three_way_failures]))
+            fraud["status"] = "FLAGGED"
+            fraud["risk"] = "HIGH"
+        if not checks.get("keywords_valid"):
+            fraud["failed_checks"] = list(dict.fromkeys([*fraud.get("failed_checks", []), "land_document_keywords_missing"]))
             fraud["status"] = "FLAGGED"
             fraud["risk"] = "HIGH"
         trust = apply_fraud(decision, fraud)
@@ -798,7 +1073,27 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
         farm_fields = {"status": trust["status"]}
         if trust.get("badge"):
             farm_fields["badge"] = trust["badge"]
-        _patch_farm(data.farm_id, farm_fields)
+        patched = _patch_farm(data.farm_id, farm_fields)
+        # Tier 3 routing: a newly flagged/pending farmer usually has no farm
+        # row yet, so the FPO desk would never see them. Auto-create one so
+        # the profile lands in the FPO pending/flagged queue.
+        created_farm_id = data.farm_id or (patched or {}).get("id")
+        if not created_farm_id and trust["status"] in ("PENDING", "FLAGGED"):
+            try:
+                created = db.insert_farm({
+                    "owner_phone": phone,
+                    "name": f"Survey {survey_number or 'unlisted'} — {trust['status'].title()} Parcel",
+                    "crop_type": pahani_fields.get("crop_name") or "Mixed Crop",
+                    "irrigation": pahani_fields.get("irrigation_source") or "Rainfed",
+                    "geojson": geojson,
+                    "area_hectares": claimed_ha,
+                    "status": trust["status"],
+                    **({"badge": trust["badge"]} if trust.get("badge") else {}),
+                })
+                if created:
+                    created_farm_id = created.get("id")
+            except Exception as exc:
+                print(f"auto-create tier3 farm failed: {exc}")
         return {
             "success": True,
             **trust,
@@ -807,6 +1102,7 @@ def verify_land_document(data: LandVerificationModel, current_user: dict = Depen
             "registry": registry,
             "fraud": fraud,
             "verification": saved,
+            "farm_id": created_farm_id,
             "polygon_geojson": geojson,
             "extracted": {
                 "survey_no": survey_number,
@@ -873,6 +1169,22 @@ def fpo_farms(
     if fpo_id:
         phones = [p.get("phone") for p in db.list_profiles_by_fpo(fpo_id) if p.get("phone")]
     farms = db.list_farms_by_status(status, owner_phones=phones)
+    # Attach farmer profile details so the desk shows who each parcel belongs to.
+    try:
+        owner_phones = list({f.get("owner_phone") for f in farms if f.get("owner_phone")})
+        names = {}
+        for op in owner_phones:
+            prof = _get_user(op)
+            if prof:
+                names[op] = {
+                    "owner_name": prof.get("name"),
+                    "village": prof.get("village"),
+                    "district": prof.get("district"),
+                }
+        for f in farms:
+            f.update(names.get(f.get("owner_phone"), {}))
+    except Exception:
+        pass
     return {"success": True, "status": status, "farms": farms}
 
 
@@ -1036,6 +1348,31 @@ def parse_pahani_document(
 @app.get("/me")
 def get_me(current_user: dict = Depends(get_current_user)):
     phone = current_user.get("phone")
+    # FPO officers authenticate by phone OTP but have no farmer profile.
+    # Serve the token identity so the officer session (role=fpo) survives
+    # login()/refresh — otherwise a colliding farmer record would clobber
+    # the role and kick the officer back to the login page.
+    if (current_user.get("role") or "").strip().lower() == "fpo":
+        farms = _get_user_farms(phone) if phone else []
+        return {
+            "success": True,
+            "user": {
+                "phone": phone,
+                "name": current_user.get("name") or "FPO Officer",
+                "role": "fpo",
+                "fpo_name": current_user.get("fpo_name") or "",
+                "state": "",
+                "district": "",
+                "village": "",
+                "upi": "",
+                "email": "",
+                "aadhaar_last4": "",
+                "fpo_id": None,
+                "preferred_language": "en",
+            },
+            "farms": farms,
+            "kyc": None,
+        }
     user = _get_user(phone)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1629,4 +1966,3 @@ def get_wallet_ledger():
             }
         ]
     }
-

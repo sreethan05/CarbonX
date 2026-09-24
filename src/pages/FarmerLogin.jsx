@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { sendLoginOtp, loginUser } from '../services/api';
 
 export default function FarmerLogin() {
   const navigate = useNavigate();
@@ -9,11 +10,13 @@ export default function FarmerLogin() {
 
   const [phone, setPhone] = useState('9876543210');
   const [showOtp, setShowOtp] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [devOtp, setDevOtp] = useState(null);
 
   const inputRefs = useRef([]);
 
@@ -29,16 +32,39 @@ export default function FarmerLogin() {
     return () => clearInterval(timer);
   }, [showOtp, countdown]);
 
-  const handleSendOtpSubmit = (e) => {
+  const handleSendOtpSubmit = async (e) => {
     e.preventDefault();
     if (phone.length < 10) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
+
     setError('');
-    setShowOtp(true);
-    setCountdown(60);
-    setCanResend(false);
+    setIsSendingOtp(true);
+    setDevOtp(null);
+
+    try {
+      const res = await sendLoginOtp(phone);
+      if (!res.success) {
+        setError(res.message || 'Failed to send OTP. Please try again.');
+        return;
+      }
+
+      if (res.dev_otp) {
+        setDevOtp(res.dev_otp);
+        setOtpDigits(res.dev_otp.split(''));
+      } else {
+        setOtpDigits(['', '', '', '', '', '']);
+      }
+
+      setShowOtp(true);
+      setCountdown(60);
+      setCanResend(false);
+    } catch (err) {
+      setError('Could not reach the OTP service. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
   const handleDigitChange = (index, value) => {
@@ -60,15 +86,37 @@ export default function FarmerLogin() {
     }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (!canResend) return;
-    setCountdown(60);
-    setCanResend(false);
-    setOtpDigits(['1', '2', '3', '4', '5', '6']);
+
     setError('');
+    setIsSendingOtp(true);
+    setDevOtp(null);
+
+    try {
+      const res = await sendLoginOtp(phone);
+      if (!res.success) {
+        setError(res.message || 'Failed to resend OTP. Please try again.');
+        return;
+      }
+
+      if (res.dev_otp) {
+        setDevOtp(res.dev_otp);
+        setOtpDigits(res.dev_otp.split(''));
+      } else {
+        setOtpDigits(['', '', '', '', '', '']);
+      }
+
+      setCountdown(60);
+      setCanResend(false);
+    } catch (err) {
+      setError('Could not resend OTP. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  const handleVerifyOtpSubmit = (e) => {
+  const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
     const fullOtp = otpDigits.join('');
     if (fullOtp.length !== 6) {
@@ -77,19 +125,22 @@ export default function FarmerLogin() {
     }
 
     setIsVerifying(true);
-    setTimeout(() => {
-      setIsVerifying(false);
-      const userData = {
-        name: 'K. Ramesh',
-        phone: phone,
-        district: 'Yadadri Bhuvanagiri',
-        village: 'Pochampally',
-        role: 'farmer',
-      };
+    setError('');
 
-      login('cx_token_' + Date.now(), userData);
+    try {
+      const res = await loginUser(phone, fullOtp);
+      if (!res.success) {
+        setError(res.message || 'Invalid OTP. Please try again.');
+        return;
+      }
+
+      login(res.token, res.user);
       navigate('/farmer/dashboard');
-    }, 500);
+    } catch (err) {
+      setError('Could not verify OTP. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -105,9 +156,6 @@ export default function FarmerLogin() {
             <div className="flex items-center justify-center gap-1.5">
               <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-surface-sage border border-forest-200 px-2.5 py-0.5 rounded-full">
                 Phone OTP Verification
-              </span>
-              <span className="text-[10px] font-semibold text-agriText-subtle bg-warm-cream px-2 py-0.5 rounded">
-                Simulated
               </span>
             </div>
             <h1 className="text-2xl font-extrabold text-carbon-900 font-manrope">Sign In to CarbonX</h1>
@@ -142,14 +190,20 @@ export default function FarmerLogin() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                disabled={isSendingOtp}
+                className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <span>Send 6-Digit OTP</span>
+                <span>{isSendingOtp ? 'Sending OTP...' : 'Send 6-Digit OTP'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+              {devOtp && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-xs text-amber-800 font-mono font-bold text-center">
+                  🔧 Dev mode — SMS not sent. OTP: <span className="text-lg tracking-widest">{devOtp}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-carbon-800 mb-1.5 text-center">
                   Enter 6-Digit Verification Code
@@ -184,7 +238,7 @@ export default function FarmerLogin() {
                 <button
                   type="button"
                   onClick={handleResendOtp}
-                  disabled={!canResend}
+                  disabled={!canResend || isSendingOtp}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                     canResend
                       ? 'bg-primary text-white hover:bg-primary-hover shadow-xs'

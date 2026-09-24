@@ -114,6 +114,22 @@ def _first_word(text: str | None) -> str | None:
     return m.group() if m else None
 
 
+def _extract_label_value(lines: list[str], *labels: str) -> str | None:
+    """Find the first line containing a label and return the value after it."""
+    for line in lines or []:
+        low = line.lower()
+        for label in labels:
+            idx = low.find(label)
+            if idx == -1:
+                continue
+            value = line[idx + len(label) :]
+            value = re.sub(r"^[^A-Za-z0-9/\-]*", "", value)
+            value = clean_line(value)
+            if value:
+                return value
+    return None
+
+
 def _section_lines(english_lines: list[str], start_kw: str, end_kw: str | None = None) -> list[str]:
     """Lines between the line containing start_kw and the line containing end_kw."""
     capturing, out = False, []
@@ -130,61 +146,75 @@ def _section_lines(english_lines: list[str], start_kw: str, end_kw: str | None =
 
 
 def parse_pahani(azure_result: dict) -> dict:
-    """Parse an Azure analyze result into structured Pahani fields.
+    """Parse an Azure analyze result into the minimal Pahani fields needed by CarbonX.
 
-    Returns ``{"fields": {...}, "missing_fields": [...], "english_text": ...}``.
+    Returns only the fields used by the verification flow:
+    survey, owner, location, extents, crop/irrigation, and optional boundary coords/remarks.
     """
     tables = azure_result.get("tables") or []
     content = azure_result.get("content") or ""
     english_lines = filter_english_lines(_all_lines(azure_result))
     fields: dict = {}
 
-    # ── Header block (Dharani) ──
+    # Header block
     m = re.search(r"Document No\s*:?\s*([A-Z0-9][A-Z0-9\-]+)", content)
     fields["document_no"] = m.group(1) if m else None
     m = re.search(r"Date of Issue\s*:?\s*([\d\-/]+)", content)
     fields["date_of_issue"] = m.group(1) if m else None
 
-    # ── 1. Village / Mandal / District ──
+    # Village / Mandal / District
     village_tbl = _find_table(tables, "district", "mandal", "village")
     fields["district"] = _col_value(village_tbl, "district")
     fields["mandal"] = _col_value(village_tbl, "mandal")
     fields["village"] = _col_value(village_tbl, "village")
-    fields["habitation"] = _col_value(village_tbl, "habitation")
-    fields["revenue_village_code"] = _col_value(village_tbl, "revenue village code")
 
-    # ── 2. Survey number ──
+    # Survey / extents
     survey_tbl = _find_table(tables, "survey no")
     survey_raw = _col_value(survey_tbl, "survey no")
     m = re.search(r"\d+/\w+", survey_raw or "")
     fields["survey_no"] = m.group() if m else None
-    fields["sub_division"] = _col_value(survey_tbl, "sub-division")
     fields["extent_acres"] = _first_float(_col_value(survey_tbl, "acres"))
     fields["extent_hectares"] = _first_float(_col_value(survey_tbl, "hectares"))
-    fields["land_type"] = _first_word(_col_value(survey_tbl, "land type"))
-    fields["classification"] = _first_word(_col_value(survey_tbl, "classification"))
 
-    # ── 3. Pattadar (owner) ──
+    # Pattadar / Aadhaar
     owner_tbl = _find_table(tables, "pattadar name")
     fields["pattadar_name"] = _col_value(owner_tbl, "pattadar name")
-    fields["pattadar_father_name"] = _col_value(owner_tbl, "father")
-    fields["relation"] = _col_value(owner_tbl, "relation")
     aadhaar_raw = _col_value(owner_tbl, "aadhaar")
     m = re.search(r"(?:X{4}-){2}\d{4}|\d{4}-\d{4}-\d{4}", aadhaar_raw or "")
     fields["aadhaar"] = m.group() if m else None
-    fields["share"] = _col_value(owner_tbl, "share")
 
-    # ── 4. Cultivation ──
+    # Cultivation / irrigation
     crop_tbl = _find_table(tables, "crop season")
-    season_raw = _col_value(crop_tbl, "crop season")
-    m = re.search(r"([A-Za-z]+).*?(\d{4}-\d{2})", season_raw or "")
-    fields["crop_season"] = f"{m.group(1)} {m.group(2)}" if m else None
     fields["crop_name"] = _first_word(_col_value(crop_tbl, "crop name"))
-    fields["cultivation_extent_acres"] = _first_float(_col_value(crop_tbl, "acres"))
-    fields["cultivation_extent_hectares"] = _first_float(_col_value(crop_tbl, "hectares"))
     fields["irrigation_source"] = _first_word(_col_value(crop_tbl, "irrigation"))
 
-    # ── 5. Land sketch coordinates ──
+    # Fallbacks from OCR line content when Azure tables are weak or missing
+    if not fields["district"]:
+        fields["district"] = _extract_label_value(english_lines, "district")
+    if not fields["mandal"]:
+        fields["mandal"] = _extract_label_value(english_lines, "mandal")
+    if not fields["village"]:
+        fields["village"] = _extract_label_value(english_lines, "village")
+    if not fields["survey_no"]:
+        fields["survey_no"] = _extract_label_value(english_lines, "survey no", "survey number")
+    if not fields["extent_acres"]:
+        extent_text = _extract_label_value(english_lines, "extent", "acres")
+        fields["extent_acres"] = _first_float(extent_text)
+    if not fields["extent_hectares"]:
+        extent_ha_text = _extract_label_value(english_lines, "hectares", "ha")
+        fields["extent_hectares"] = _first_float(extent_ha_text)
+    if not fields["pattadar_name"]:
+        fields["pattadar_name"] = _extract_label_value(english_lines, "pattadar name", "pattadar")
+    if not fields["aadhaar"]:
+        aadhaar_text = "\n".join(english_lines)
+        m = re.search(r"(?:X{4}-){2}\d{4}|\d{4}-\d{4}-\d{4}", aadhaar_text)
+        fields["aadhaar"] = m.group() if m else None
+    if not fields["crop_name"]:
+        fields["crop_name"] = _extract_label_value(english_lines, "crop name", "crop")
+    if not fields["irrigation_source"]:
+        fields["irrigation_source"] = _extract_label_value(english_lines, "irrigation")
+
+    # Boundary geometry / remarks
     coords = []
     sketch_grid = _find_table(tables, "latitude", "longitude")
     if sketch_grid:
@@ -202,25 +232,8 @@ def parse_pahani(azure_result: dict) -> dict:
                     continue
     fields["boundary_coords"] = coords or None
 
-    # ── 6. Remarks ──
     remarks = _section_lines(english_lines, "remarks", "additional information")
     fields["remarks"] = " ".join(remarks).strip() or None
-
-    # ── 7. Additional info (label/value rows) ──
-    info_grid = _find_table(tables, "market value")
-
-    def _info(keyword: str) -> str | None:
-        if not info_grid:
-            return None
-        for row in info_grid:
-            if row and keyword in row[0].lower():
-                return clean_line(row[1]) if len(row) > 1 else None
-        return None
-
-    fields["market_value_per_acre"] = _info("market value (rs./acre)") or _info("market value")
-    fields["total_market_value"] = _info("total market value")
-    fields["mutation_status"] = _info("mutation status")
-    fields["last_updated"] = _info("last updated")
 
     missing = [k for k, v in fields.items() if v is None]
     return {

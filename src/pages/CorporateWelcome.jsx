@@ -1,14 +1,44 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, ShieldCheck, ArrowRight, Layers, Sparkles, Building2 } from 'lucide-react';
+import { Globe, ShieldCheck, ArrowRight, Layers, Sparkles, Building2, Info } from 'lucide-react';
 import BadgePill from '../components/BadgePill';
+import { useAuth } from '../context/AuthContext';
 
 export default function CorporateWelcome() {
   const navigate = useNavigate();
+  const { isAuthenticated, role, user } = useAuth();
+  const isBuyer = role === 'buyer';
+  const isFarmerSession = isAuthenticated && !isBuyer;
 
   return (
     <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900 py-8 px-4 md:px-10">
       <div className="max-w-7xl mx-auto space-y-6">
+
+        {isFarmerSession && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
+            <div className="flex items-start gap-2 flex-1">
+              <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <p className="text-amber-900">
+                <span className="font-bold">You're signed in as {user?.name || 'a farmer'}.</span>{' '}
+                This portal is for companies — purchasing needs a separate company account.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => navigate('/corporate/login')}
+                className="px-4 py-2 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all"
+              >
+                Continue as Company
+              </button>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-4 py-2 bg-white border border-amber-200 text-amber-900 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Hero */}
         <div className="bg-[#1B4332] text-white border border-emerald-900 shadow-sm rounded-xl p-8 relative overflow-hidden">
@@ -33,13 +63,18 @@ export default function CorporateWelcome() {
               </button>
 
               <button
-                onClick={() => navigate('/marketplace/checkout')}
+                onClick={() => navigate(isBuyer ? '/marketplace/checkout' : '/corporate/login')}
                 className="px-6 py-3 bg-[#2D6A4F] hover:bg-[#40916C] text-[#D1FAE5] border border-emerald-500 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4 text-emerald-300" />
-                <span>Run Bulk Auto-Match Engine</span>
+                <span>{isBuyer ? 'Run Bulk Auto-Match Engine' : 'Company Sign In to Buy'}</span>
               </button>
             </div>
+            {!isBuyer && (
+              <p className="text-[11px] text-slate-400">
+                Browsing is open to everyone — buying and bulk matching need a company account.
+              </p>
+            )}
           </div>
         </div>
 

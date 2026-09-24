@@ -36,7 +36,7 @@ export default function LandingPage() {
             </div>
 
             <button
-              onClick={() => navigate('/farmer/login')}
+              onClick={() => navigate('/role-selection')}
               className="text-xs font-semibold text-emerald-100 hover:text-white px-3 py-2 rounded-xl transition-colors hidden sm:block"
             >
               Sign In
@@ -46,7 +46,7 @@ export default function LandingPage() {
               onClick={() => navigate('/role-selection')}
               className="text-xs font-bold text-white bg-[#2D6A4F] hover:bg-[#40916C] px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 border border-emerald-500"
             >
-              <span>Launch Portal</span>
+              <span>Get Started</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -74,25 +74,22 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => navigate('/farmer/register')}
-              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2"
+              onClick={() => navigate('/role-selection')}
+              className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2"
             >
-              <span>Farmer Voice Registration</span>
+              <span>Get Started</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={() => navigate('/fpo/dashboard')}
-              className="px-6 py-3.5 bg-[#2D6A4F] hover:bg-[#40916C] text-white border border-emerald-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
-            >
-              <span>FPO Command Center</span>
-            </button>
-            <button
               onClick={() => navigate('/marketplace')}
-              className="px-6 py-3.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-[#D1FAE5] border border-emerald-600 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+              className="px-8 py-3.5 bg-transparent hover:bg-white/10 text-[#D1FAE5] border border-emerald-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
             >
-              <span>Corporate Marketplace</span>
+              <span>Explore Marketplace</span>
             </button>
           </div>
+          <p className="text-xs text-emerald-200/80 mt-5">
+            Farmer, FPO, or Corporate buyer — pick your portal below.
+          </p>
         </div>
       </section>
 
@@ -159,8 +156,8 @@ export default function LandingPage() {
       {/* Quick Portal Navigation Cards */}
       <section className="max-w-7xl mx-auto px-4 md:px-10 mb-20">
         <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 font-manrope">Ecosystem Access Portals</h2>
-          <p className="text-sm text-slate-600 mt-2">Select your role to access dedicated tools and verification workflows.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 font-manrope">Choose Your Portal</h2>
+          <p className="text-sm text-slate-600 mt-2">One portal per role — sign in to access your dedicated workspace.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -196,7 +193,7 @@ export default function LandingPage() {
               </p>
             </div>
             <button
-              onClick={() => navigate('/fpo/dashboard')}
+              onClick={() => navigate('/fpo/login')}
               className="mt-6 w-full py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
             >
               <span>Access FPO Desk</span>
@@ -216,7 +213,7 @@ export default function LandingPage() {
               </p>
             </div>
             <button
-              onClick={() => navigate('/marketplace')}
+              onClick={() => navigate('/corporate/welcome')}
               className="mt-6 w-full py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
             >
               <span>Explore Credit Marketplace</span>
@@ -232,8 +229,8 @@ export default function LandingPage() {
           <p>CarbonX Platform: Enterprise Institutional AgTech Ecosystem</p>
           <div className="flex gap-4">
             <button onClick={() => navigate('/role-selection')} className="hover:text-white transition-colors">Role Portal</button>
+            <button onClick={() => navigate('/support')} className="hover:text-white transition-colors">Support</button>
             <button onClick={() => navigate('/marketplace')} className="hover:text-white transition-colors">Marketplace</button>
-            <button onClick={() => navigate('/fpo/dashboard')} className="hover:text-white transition-colors">FPO Desk</button>
           </div>
         </div>
       </footer>

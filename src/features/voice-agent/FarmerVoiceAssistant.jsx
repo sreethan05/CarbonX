@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Check, Loader2, Map, Mic, MicOff, Navigation, Pause, Play, Send, Volume2, X,
+  Check, ChevronDown, Loader2, Map, MessageCircle, Mic, MicOff, Minus, Navigation, Pause, Play, Send, Volume2, X,
 } from 'lucide-react';
-import { sendVoiceAudioQuery, sendVoiceTextQuery, updateProfile } from '../../services/api';
+import { sendVoiceAudioQuery, sendVoiceTextQuery, updateProfile, AuthError } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const LANGUAGE_OPTIONS = [
@@ -53,7 +53,7 @@ function pathForAction(action) {
 
 export default function FarmerVoiceAssistant() {
   const navigate = useNavigate();
-  const { role, refreshUser } = useAuth();
+  const { role, refreshUser, logout } = useAuth();
   const [language, setLanguage] = useState('te-IN');
   const [sessionId, setSessionId] = useState(null);
   const [text, setText] = useState('');
@@ -69,12 +69,25 @@ export default function FarmerVoiceAssistant() {
   const speechRecognitionRef = useRef(null);
   const chunksRef = useRef([]);
   const audioRef = useRef(null);
+  // Minimizable floating widget: default collapsed so it never covers
+  // primary actions (e.g. Confirm Boundary & Proceed). Persists per browser.
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem('carbonx_voice_open') === '1'; } catch { return false; }
+  });
+  const [hasUpdate, setHasUpdate] = useState(false);
 
   if (role !== 'farmer') return null;
+
+  const setOpenPersist = (value) => {
+    setOpen(value);
+    if (value) setHasUpdate(false);
+    try { localStorage.setItem('carbonx_voice_open', value ? '1' : '0'); } catch { /* ignore */ }
+  };
 
   const applyResult = (data) => {
     if (!data?.success) {
       setError(data?.detail || data?.message || 'Voice assistant is unavailable.');
+      setHasUpdate(true);
       return;
     }
     setSessionId(data.session_id || null);
@@ -82,6 +95,7 @@ export default function FarmerVoiceAssistant() {
     setResponseText(data.response_text || '');
     setActions((data.actions || []).filter((action) => SAFE_ACTIONS.has(action.type)));
     setConfirmation(data.confirmation || null);
+    setHasUpdate(true);
     if (data.audio_base64) {
       audioRef.current = new Audio(`data:${data.audio_mime_type || 'audio/wav'};base64,${data.audio_base64}`);
       audioRef.current.onended = () => setPlaying(false);
@@ -99,8 +113,13 @@ export default function FarmerVoiceAssistant() {
       const data = await sendVoiceTextQuery({ text: prompt, language_code: language, session_id: sessionId });
       applyResult(data);
       setText('');
-    } catch {
-      setError('Could not reach the voice assistant.');
+    } catch (err) {
+      if (err instanceof AuthError) {
+        logout();
+        setError('Your session has expired. Please log in again to use the voice assistant.');
+      } else {
+        setError('Could not reach the voice assistant. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -178,8 +197,13 @@ export default function FarmerVoiceAssistant() {
           const file = new File([blob], 'carbonx-voice.webm', { type: blob.type });
           const data = await sendVoiceAudioQuery({ file, language_code: language, session_id: sessionId });
           applyResult(data);
-        } catch {
-          setError('Could not process the recording.');
+        } catch (err) {
+          if (err instanceof AuthError) {
+            logout();
+            setError('Your session has expired. Please log in again to use the voice assistant.');
+          } else {
+            setError('Could not process the recording. Please try again.');
+          }
         } finally {
           setLoading(false);
         }
@@ -221,16 +245,40 @@ export default function FarmerVoiceAssistant() {
       if (!res.success) throw new Error(res.message);
       await refreshUser();
       setConfirmation(null);
-    } catch {
-      setError('Could not save the confirmed values.');
+    } catch (err) {
+      if (err instanceof AuthError) {
+        logout();
+        setError('Your session has expired. Please log in again.');
+      } else {
+        setError('Could not save the confirmed values.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Collapsed: small floating button that never blocks page actions.
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpenPersist(true)}
+        title="Open Farmer Voice Assistant"
+        aria-label="Open voice assistant"
+        className="fixed right-4 bottom-24 md:bottom-6 z-40 h-14 w-14 rounded-full bg-forest-800 hover:bg-forest-700 text-white shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+      >
+        {recording ? <MicOff size={22} /> : <MessageCircle size={22} />}
+        {hasUpdate && (
+          <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-rose-500 border-2 border-white" />
+        )}
+      </button>
+    );
+  }
+
   return (
-    <section className="fixed right-4 bottom-20 md:bottom-4 z-50 w-[calc(100vw-2rem)] max-w-sm bg-white border border-forest-100 shadow-xl rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-forest-100 flex items-center justify-between gap-3">
+    <>
+      <section className="fixed right-4 bottom-24 md:bottom-20 z-40 w-[calc(100vw-2rem)] max-w-sm bg-white border border-forest-100 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[62vh]">
+      <div className="px-4 py-3 border-b border-forest-100 flex items-center justify-between gap-3 bg-white">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-forest-800 text-white flex items-center justify-center shrink-0">
             <Volume2 size={16} />
@@ -240,16 +288,28 @@ export default function FarmerVoiceAssistant() {
             <p className="text-[10px] text-carbon-500 truncate">Telugu, Hindi, English, mixed speech</p>
           </div>
         </div>
-        <select
-          value={language}
-          onChange={(event) => setLanguage(event.target.value)}
-          className="text-[11px] font-bold bg-forest-50 border border-forest-100 rounded-lg px-2 py-1.5 text-carbon-800 outline-none"
-        >
-          {LANGUAGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <select
+            value={language}
+            onChange={(event) => setLanguage(event.target.value)}
+            className="text-[11px] font-bold bg-forest-50 border border-forest-100 rounded-lg px-2 py-1.5 text-carbon-800 outline-none"
+            title="Language"
+          >
+            {LANGUAGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => setOpenPersist(false)}
+            title="Minimize"
+            aria-label="Minimize voice assistant"
+            className="w-8 h-8 rounded-lg hover:bg-forest-50 text-carbon-500 hover:text-carbon-800 flex items-center justify-center transition-colors"
+          >
+            {open ? <ChevronDown size={16} /> : <Minus size={16} />}
+          </button>
+        </div>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 overflow-y-auto">
         {error && <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">{error}</div>}
 
         <div className="flex gap-2">
@@ -363,6 +423,7 @@ export default function FarmerVoiceAssistant() {
           </div>
         )}
       </div>
-    </section>
+      </section>
+    </>
   );
 }

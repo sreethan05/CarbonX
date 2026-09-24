@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Volume2, Phone, ShieldCheck, ArrowRight, CheckCircle2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { sendOtp, verifyRegistrationOtp, registerUser } from '../services/api';
 
 export default function FarmerRegister() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function FarmerRegister() {
   const [district, setDistrict] = useState('Yadadri Bhuvanagiri');
   const [mandal, setMandal] = useState('Pochampally');
   const [village, setVillage] = useState('Pochampally');
+  const [surveyNumber, setSurveyNumber] = useState('');
 
   // OTP Verification State
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -29,6 +31,9 @@ export default function FarmerRegister() {
   const [otpTimer, setOtpTimer] = useState(600); // 10 minutes timer
   const [timerActive, setTimerActive] = useState(false);
   const [otpError, setOtpError] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [devOtp, setDevOtp] = useState(null); // shown when SMS not configured (dev mode)
 
   useEffect(() => {
     let interval = null;
@@ -63,34 +68,88 @@ export default function FarmerRegister() {
     }
   };
 
-  const handleSubmitForm = (e) => {
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
-    if (!name || !phone) return;
-    setShowOtpModal(true);
-    setTimerActive(true);
-    setOtpTimer(600);
+    if (!name || !phone || !rawIdNumber) return;
+
+    setOtpError('');
+    setIsSendingOtp(true);
+    setDevOtp(null);
+
+    try {
+      const res = await sendOtp(phone);
+      if (!res.success) {
+        setOtpError(res.message || 'Failed to send OTP. Please try again.');
+        return;
+      }
+
+      // Dev mode: backend returns the OTP directly when SMS isn't configured
+      if (res.dev_otp) {
+        setDevOtp(res.dev_otp);
+        setOtp(res.dev_otp); // auto-fill for convenience
+      }
+
+      setShowOtpModal(true);
+      setTimerActive(true);
+      setOtpTimer(600);
+    } catch (error) {
+      setOtpError('Could not reach the OTP service. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  const handleVerifyOtpSubmit = (e) => {
+  const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
-    if (otp.length !== 6 && otp !== '123456') {
+    if (otp.length !== 6) {
       setOtpError('Invalid 6-digit OTP code');
       return;
     }
 
-    const userData = {
-      name,
-      phone,
-      district,
-      mandal,
-      village,
-      role: 'farmer',
-      aadhaar_last4: rawIdNumber.slice(-4) || '3210'
-    };
+    setOtpError('');
+    setIsRegistering(true);
 
-    login('cx_token_' + Date.now(), userData);
-    setShowOtpModal(false);
-    navigate('/farmer/land-verification');
+    try {
+      const verifyRes = await verifyRegistrationOtp(phone, otp);
+      if (!verifyRes.success) {
+        setOtpError(verifyRes.message || 'Invalid or expired OTP');
+        return;
+      }
+
+      const userData = {
+        phone,
+        otp,
+        otp_verification_token: verifyRes.verification_token,
+        name,
+        aadhaar: rawIdNumber,
+        state: '',
+        district,
+        village,
+        upi: '',
+        email: '',
+        role: 'farmer',
+        preferred_language: 'en',
+      };
+
+      const regRes = await registerUser(userData);
+      if (!regRes.success) {
+        setOtpError(regRes.message || 'Registration failed. Please try again.');
+        return;
+      }
+
+      login(regRes.token, regRes.user);
+      setShowOtpModal(false);
+      // Tier decision happens on the land-verification page: a registry hit
+      // routes to Tier 1 (auto, no documents), a miss routes to Tier 2
+      // (Pahani upload + manual boundary). Tier 3 is decided later by FPO.
+      navigate('/farmer/land-verification', {
+        state: surveyNumber.trim() ? { surveyNumber: surveyNumber.trim() } : undefined,
+      });
+    } catch (error) {
+      setOtpError('Registration could not be completed. Please try again.');
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   const formatTimer = (seconds) => {
@@ -222,7 +281,7 @@ export default function FarmerRegister() {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Village Name</label>
               <input
                 type="text"
@@ -231,25 +290,39 @@ export default function FarmerRegister() {
                 className="w-full px-3 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Survey Number <span className="font-semibold text-slate-400">(decides verification tier)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 101/A — registry hit = Tier 1, miss = Tier 2"
+                value={surveyNumber}
+                onChange={(e) => setSurveyNumber(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-emerald-600 font-mono"
+              />
+            </div>
           </div>
 
           <button
             type="submit"
-            className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 mt-4"
+            disabled={isSendingOtp}
+            className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 mt-4 disabled:opacity-60"
           >
-            <span>Generate Twilio OTP Verification</span>
+            <span>{isSendingOtp ? 'Sending OTP...' : 'Generate OTP Verification'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Twilio OTP Verification Modal */}
+        {/* OTP Verification Modal */}
         {showOtpModal && (
           <div className="fixed inset-0 z-50 bg-[#1B4332]/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white border border-slate-200 shadow-xl rounded-xl p-6 max-w-md w-full space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Phone className="w-5 h-5 text-emerald-700" />
-                  <h3 className="text-sm font-bold text-slate-900">Twilio OTP Verification</h3>
+                  <h3 className="text-sm font-bold text-slate-900">OTP Verification</h3>
                 </div>
                 <span className="text-xs font-mono font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
                   {formatTimer(otpTimer)}
@@ -259,6 +332,12 @@ export default function FarmerRegister() {
               <p className="text-xs text-slate-600">
                 A 6-digit authentication code has been dispatched to <span className="font-bold text-slate-900">+91 {phone}</span>.
               </p>
+
+              {devOtp && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-xs text-amber-800 font-mono font-bold text-center">
+                  🔧 Dev mode — SMS not sent. OTP: <span className="text-lg tracking-widest">{devOtp}</span>
+                </div>
+              )}
 
               {otpError && (
                 <p className="text-xs text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2 rounded">
@@ -280,18 +359,7 @@ export default function FarmerRegister() {
                   />
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] text-slate-600 flex justify-between items-center">
-                  <span>Demo Mode Bypass Code: <strong className="font-mono text-emerald-800">123456</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => setOtp('123456')}
-                    className="text-[10px] font-bold bg-emerald-700 text-white px-2 py-0.5 rounded"
-                  >
-                    Autofill
-                  </button>
-                </div>
-
-                <div className="flex gap-2">
+                  <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setShowOtpModal(false)}
@@ -301,9 +369,10 @@ export default function FarmerRegister() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 flex items-center justify-center gap-1"
+                    disabled={isRegistering}
+                    className="flex-1 py-2.5 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 flex items-center justify-center gap-1 disabled:opacity-60"
                   >
-                    <span>Verify & Route</span>
+                    <span>{isRegistering ? 'Verifying...' : 'Verify & Route'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

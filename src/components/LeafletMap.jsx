@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, Tooltip, CircleMarker, LayersControl, ScaleControl, ZoomControl, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -79,32 +79,75 @@ function calculatePolygonAreaHa(pts) {
 export default function LeafletMap({
   readOnly = false,
   initialPoints = null,
+  center = null,
+  placeLabel = '',
+  subLabel = '',
   onGeojsonDrawn = null,
   onAreaCalculated = null,
   showHeatmapToggle = true,
   height = '60vh',
 }) {
+  const defaultPoints = [
+    [17.383, 78.484],
+    [17.383, 78.487],
+    [17.386, 78.487],
+    [17.386, 78.484],
+  ];
   const [search, setSearch] = useState('');
-  const [flyTo, setFlyTo] = useState(null);
+  const [flyTo, setFlyTo] = useState(center || null);
   const [polygonMode, setPolygonMode] = useState(false);
-  const [polygonPoints, setPolygonPoints] = useState(
-    initialPoints || [
-      [17.383, 78.484],
-      [17.383, 78.487],
-      [17.386, 78.487],
-      [17.386, 78.484],
-    ]
-  );
+  const [polygonPoints, setPolygonPoints] = useState(initialPoints || defaultPoints);
   const [polygonClosed, setPolygonClosed] = useState(true);
   const [status, setStatus] = useState(readOnly ? '🔒 Cadastral Boundary Locked (Tier 1A)' : '');
   const [heatmapActive, setHeatmapActive] = useState(false);
+  // Search result marker + reverse-geocoded place name so the map always
+  // shows human-readable location context (village / mandal / district).
+  const [searchMarker, setSearchMarker] = useState(null);
+  const [placeName, setPlaceName] = useState('');
 
+  // When verification supplies the exact registry/doc polygon, load it and
+  // fly the map to its coordinates.
   useEffect(() => {
     if (initialPoints && initialPoints.length >= 3) {
       setPolygonPoints(initialPoints);
       setPolygonClosed(true);
+      const lat = initialPoints.reduce((s, p) => s + p[0], 0) / initialPoints.length;
+      const lng = initialPoints.reduce((s, p) => s + p[1], 0) / initialPoints.length;
+      setFlyTo([lat, lng]);
+      setStatus(readOnly ? '🔒 Cadastral Boundary Locked (Tier 1A)' : '📍 Exact record location marked — confirm or redraw');
     }
-  }, [initialPoints]);
+  }, [initialPoints, readOnly]);
+
+  useEffect(() => {
+    if (center && center.length === 2) setFlyTo(center);
+  }, [center]);
+
+  // Reverse-geocode the parcel centroid so a real place name
+  // (village / town / mandal) is shown on the map, not just coordinates.
+  useEffect(() => {
+    const pts = polygonPoints.length >= 3 ? polygonPoints : (center || null);
+    if (!pts) return;
+    const lat = Array.isArray(pts[0])
+      ? pts.reduce((s, p) => s + p[0], 0) / pts.length
+      : pts[0];
+    const lng = Array.isArray(pts[0])
+      ? pts.reduce((s, p) => s + p[1], 0) / pts.length
+      : pts[1];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    let cancelled = false;
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&accept-language=en`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const addr = d.address || {};
+        const named = addr.village || addr.town || addr.city || addr.suburb || addr.hamlet || addr.county || '';
+        const label = [named, addr.state_district || addr.district || '', addr.state || ''].filter(Boolean).join(', ');
+        setPlaceName(label || (d.display_name ? d.display_name.split(',').slice(0, 3).join(',') : ''));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polygonPoints, center]);
 
   const emitGeojson = (pts) => {
     if (!pts || pts.length < 3) return;
@@ -161,7 +204,10 @@ export default function LeafletMap({
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(search)}`);
       const data = await res.json();
       if (data.length > 0) {
-        setFlyTo([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        setFlyTo([lat, lng]);
+        setSearchMarker({ position: [lat, lng], name: data[0].display_name });
         setStatus(`Location found: ${data[0].display_name.split(',')[0]}`);
       } else {
         setStatus('Location not found.');
@@ -171,23 +217,51 @@ export default function LeafletMap({
     }
   };
 
+  const centroid = polygonPoints.length >= 3
+    ? [
+        polygonPoints.reduce((s, p) => s + p[0], 0) / polygonPoints.length,
+        polygonPoints.reduce((s, p) => s + p[1], 0) / polygonPoints.length,
+      ]
+    : center;
   const currentAreaHa = polygonClosed ? calculatePolygonAreaHa(polygonPoints) : 0;
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-forest-100 shadow-card" style={{ height, minHeight: 360 }}>
       <MapContainer
-        center={polygonPoints.length > 0 ? polygonPoints[0] : [17.385, 78.4867]}
-        zoom={15}
+        center={center || (polygonPoints.length > 0 ? polygonPoints[0] : [17.385, 78.4867])}
+        zoom={16}
         maxZoom={22}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
       >
-        <TileLayer
-          url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-          subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
-          maxZoom={22}
-          attribution="&copy; Google Satellite"
-        />
+        <ZoomControl position="bottomright" />
+        <ScaleControl position="bottomleft" imperial={false} />
+        <LayersControl position="topright">
+          {/* Default: satellite WITH place/road labels so names are visible */}
+          <LayersControl.BaseLayer checked name="Hybrid (places + labels)">
+            <TileLayer
+              url="https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+              maxZoom={22}
+              attribution="&copy; Google · OSM contributors"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Satellite">
+            <TileLayer
+              url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+              maxZoom={22}
+              attribution="&copy; Google Satellite"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Streets (place names)">
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+              attribution="&copy; OpenStreetMap contributors"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
         {flyTo && <FlyToLocation position={flyTo} />}
         <MapClickHandler
           readOnly={readOnly}
@@ -222,7 +296,34 @@ export default function LeafletMap({
                 ? { color: '#DC2626', fillColor: '#16A34A', fillOpacity: 0.55, weight: 3 }
                 : { color: readOnly ? '#155435' : '#1F7A4D', fillColor: '#1F7A4D', fillOpacity: 0.3, weight: readOnly ? 4 : 3 }
             }
-          />
+          >
+            <Tooltip permanent direction="top" className="parcel-label">
+              {placeLabel || 'Farm parcel'}{placeName ? ` · ${placeName.split(',')[0]}` : ''}
+            </Tooltip>
+            <Popup>
+              <div className="text-xs">
+                <p className="font-bold">{placeLabel || 'Farm parcel'}</p>
+                {subLabel && <p className="text-gray-600">{subLabel}</p>}
+                {placeName && <p className="text-gray-600 mt-0.5">{placeName}</p>}
+                {centroid && <p className="font-mono mt-0.5">{centroid[0].toFixed(5)}, {centroid[1].toFixed(5)}</p>}
+              </div>
+            </Popup>
+          </Polygon>
+        )}
+        {centroid && (
+          <CircleMarker center={centroid} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: '#1F7A4D', fillOpacity: 1 }}>
+            <Popup>
+              <div className="text-xs">
+                <p className="font-bold">{placeLabel || 'Parcel centre'}</p>
+                {placeName && <p className="text-gray-600">{placeName}</p>}
+              </div>
+            </Popup>
+          </CircleMarker>
+        )}
+        {searchMarker && (
+          <Marker position={searchMarker.position}>
+            <Popup>{searchMarker.name}</Popup>
+          </Marker>
         )}
       </MapContainer>
 

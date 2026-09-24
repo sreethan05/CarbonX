@@ -2,7 +2,9 @@
 
 import hmac
 import os
+import sqlite3
 import time
+from pathlib import Path
 import redis
 
 OTP_TTL_SECONDS = 10 * 60
@@ -12,6 +14,24 @@ OTP_ATTEMPT_PREFIX = "carbonx:otp_attempts:"
 
 _client: redis.Redis | None = None
 _memory_store: dict[str, tuple[str, float, int]] = {}
+_SQLITE_PATH = Path(__file__).resolve().parents[2] / ".runtime" / "otp.sqlite3"
+
+
+def _sqlite_connection() -> sqlite3.Connection:
+    _SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(_SQLITE_PATH, timeout=5)
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS otp_store (
+            phone TEXT PRIMARY KEY,
+            otp TEXT NOT NULL,
+            expires_at REAL NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    connection.commit()
+    return connection
 
 
 def _redis_client() -> redis.Redis | None:
@@ -45,8 +65,18 @@ def store_otp(phone: str, otp: str) -> None:
             return
         except Exception:
             pass
-    # In-memory fallback if Redis is down or not running
-    _memory_store[phone] = (otp, time.time() + OTP_TTL_SECONDS, 0)
+    expires_at = time.time() + OTP_TTL_SECONDS
+    try:
+        with _sqlite_connection() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO otp_store(phone, otp, expires_at, attempts) VALUES (?, ?, ?, 0)",
+                (phone, otp, expires_at),
+            )
+            connection.commit()
+        return
+    except sqlite3.Error:
+        # Last-resort fallback for an unavailable local filesystem.
+        _memory_store[phone] = (otp, expires_at, 0)
 
 
 def verify_otp(phone: str, otp: str) -> bool:
@@ -68,7 +98,37 @@ def verify_otp(phone: str, otp: str) -> bool:
             return True
         except Exception:
             pass
-    # In-memory fallback
+    try:
+        with _sqlite_connection() as connection:
+            row = connection.execute(
+                "SELECT otp, expires_at, attempts FROM otp_store WHERE phone = ?",
+                (phone,),
+            ).fetchone()
+            if not row:
+                return False
+            stored_otp, expires_at, attempts = row
+            if time.time() > expires_at:
+                connection.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
+                connection.commit()
+                return False
+            if not hmac.compare_digest(str(stored_otp), str(otp)):
+                attempts += 1
+                if attempts >= OTP_MAX_ATTEMPTS:
+                    connection.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
+                else:
+                    connection.execute(
+                        "UPDATE otp_store SET attempts = ? WHERE phone = ?",
+                        (attempts, phone),
+                    )
+                connection.commit()
+                return False
+            connection.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
+            connection.commit()
+            return True
+    except sqlite3.Error:
+        pass
+
+    # Last-resort in-memory fallback.
     stored = _memory_store.get(phone)
     if not stored:
         return False
@@ -95,6 +155,12 @@ def clear_otp(phone: str) -> None:
             client.delete(_attempt_key(phone))
         except Exception:
             pass
+    try:
+        with _sqlite_connection() as connection:
+            connection.execute("DELETE FROM otp_store WHERE phone = ?", (phone,))
+            connection.commit()
+    except sqlite3.Error:
+        pass
     _memory_store.pop(phone, None)
 
 
@@ -106,4 +172,3 @@ def health_check() -> bool:
         except Exception:
             return False
     return False
-

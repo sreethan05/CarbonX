@@ -33,25 +33,48 @@ def decide_tier(
     ocr_owner: str = "",
     claimed_area_ha: Optional[float] = None,
 ) -> dict:
-    """Return {tier, badge, path} before fraud is applied."""
+    """Return {tier, badge, path} before fraud is applied.
+
+    Strict ownership rule: the logged-in profile name must match BOTH the
+    registry owner and the document owner. A document belonging to someone
+    else (e.g. Ramesh's Pahani uploaded under Mallaiah's profile) must never
+    yield Tier 1 — it is flagged via ``owner_mismatch`` so ``verify-land``
+    can force FLAGGED / NOT VERIFIED.
+    """
     if fpo_path or not (survey_number or "").strip():
-        return {"tier": None, "badge": None, "path": "fpo"}
+        return {"tier": None, "badge": None, "path": "fpo", "owner_mismatch": False}
 
     found = bool(registry and registry.get("found"))
     if not found:
-        return {"tier": "2", "badge": "DOCUMENT", "path": "registry"}
+        # Tier 2 still requires doc owner == profile owner.
+        profile_doc_ok = names_match(owner_name, ocr_owner) if ocr_owner else True
+        return {
+            "tier": "2",
+            "badge": "DOCUMENT",
+            "path": "registry",
+            "owner_mismatch": not profile_doc_ok,
+        }
 
     has_geom = bool(registry.get("registry_geometry_available") or registry.get("geojson"))
     registry_owner = registry.get("owner_name") or ""
-    owner_ok = names_match(owner_name, registry_owner) or names_match(ocr_owner, registry_owner) or names_match(owner_name, ocr_owner)
+    profile_matches_registry = names_match(owner_name, registry_owner)
+    ocr_given = bool((ocr_owner or "").strip())
+    doc_matches_registry = names_match(ocr_owner, registry_owner) if ocr_given else True
+    profile_matches_doc = names_match(owner_name, ocr_owner) if ocr_given else True
+    owner_mismatch = not (profile_matches_registry and doc_matches_registry and profile_matches_doc)
     area_ok = True
     if claimed_area_ha and registry.get("area_ha"):
         delta = area_delta_pct(float(registry["area_ha"]), float(claimed_area_ha))
         area_ok = delta is None or delta <= AREA_TOLERANCE_PCT
 
-    if has_geom and owner_ok and area_ok:
-        return {"tier": "1A", "badge": "REGISTRY", "path": "registry"}
-    return {"tier": "1B", "badge": "REGISTRY_DOC", "path": "registry"}
+    if has_geom and not owner_mismatch and area_ok:
+        return {"tier": "1A", "badge": "REGISTRY", "path": "registry", "owner_mismatch": False}
+    return {
+        "tier": "1B",
+        "badge": "REGISTRY_DOC",
+        "path": "registry",
+        "owner_mismatch": owner_mismatch,
+    }
 
 
 def apply_fraud(decision: dict, fraud: dict) -> dict:
@@ -66,9 +89,14 @@ def apply_fraud(decision: dict, fraud: dict) -> dict:
             "marketplace_eligible": False,
             "credits_blocked": True,
         }
+    failed = list(fraud.get("failed_checks") or [])
+    # Hard ownership rule: doc/registry must belong to the logged-in profile.
+    if decision.get("owner_mismatch"):
+        failed = list(dict.fromkeys([*failed, "profile_owner_mismatch"]))
     status = fraud.get("status") or "VERIFIED"
     risk = fraud.get("risk") or "LOW"
-    failed = fraud.get("failed_checks") or []
+    if "profile_owner_mismatch" in failed:
+        status, risk = "FLAGGED", "HIGH"
     flagged = status == "FLAGGED"
     badge = None if flagged else decision.get("badge")
     return {

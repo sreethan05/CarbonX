@@ -70,7 +70,7 @@ class TestCarbonXFullSuite(unittest.TestCase):
         otp_data = otp_res.json()
         self.assertTrue(otp_data.get("success"))
         otp = otp_data.get("dev_otp")
-        self.assertIsNotNone(otp, "Dev OTP should be returned when Twilio is not in live mode")
+        self.assertIsNotNone(otp, "Dev OTP should be returned only when Textplate is not configured")
 
         verify_otp_res = self.client.post(
             "/register/verify-otp",

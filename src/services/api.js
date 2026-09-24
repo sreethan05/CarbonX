@@ -1,9 +1,25 @@
 const PY = '/py-api';
 const BC = '/bc-api';
 
+/** Thrown when the backend returns 401 Unauthorized (token missing/expired/invalid). */
+export class AuthError extends Error {
+  constructor(message = 'Session expired. Please log in again.') {
+    super(message);
+    this.name = 'AuthError';
+    this.status = 401;
+  }
+}
+
 function authHeaders() {
   const token = localStorage.getItem('carbonx_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function _checkAuth(res) {
+  if (res.status === 401) {
+    throw new AuthError();
+  }
+  return res;
 }
 
 async function post(url, body) {
@@ -12,6 +28,7 @@ async function post(url, body) {
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
+  await _checkAuth(res);
   return res.json();
 }
 
@@ -21,11 +38,13 @@ async function patch(url, body) {
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
+  await _checkAuth(res);
   return res.json();
 }
 
 async function get(url) {
   const res = await fetch(url, { headers: authHeaders() });
+  await _checkAuth(res);
   return res.json();
 }
 
@@ -51,6 +70,10 @@ export async function loginUser(phone, otp) {
   return post(`${PY}/login`, { phone, otp });
 }
 
+export async function loginFpo(phone, fpoName, otp) {
+  return post(`${PY}/fpo/login`, { phone, fpo_name: fpoName, otp });
+}
+
 export async function getMe() {
   return get(`${PY}/me`);
 }
@@ -60,6 +83,10 @@ export async function updateProfile(fields) {
 }
 
 // Voice assistant
+
+export async function supportChat(message, history = [], language = 'en') {
+  return post(`${PY}/support/chat`, { message, history, language });
+}
 
 export async function sendVoiceTextQuery(payload) {
   return post(`${PY}/api/v1/voice/text-query`, payload);
@@ -75,6 +102,7 @@ export async function sendVoiceAudioQuery({ file, language_code, session_id }) {
     headers: authHeaders(),
     body: form,
   });
+  await _checkAuth(res);
   return res.json();
 }
 
@@ -113,6 +141,30 @@ export async function predictBiodiversity(longitude, latitude) {
     { headers: authHeaders() }
   );
   return res.json();
+}
+
+// ── Land registry & verification tiers ──
+
+export async function lookupRegistry(surveyNumber) {
+  return get(`${PY}/land/registry/${encodeURIComponent(surveyNumber)}`);
+}
+
+export async function autoDrawBoundary(payload) {
+  return post(`${PY}/land/auto-draw`, payload);
+}
+
+// ── FPO review queue (Tier 3) ──
+
+export async function getFpoFarms(status = 'PENDING') {
+  return get(`${PY}/fpo/farms?status=${encodeURIComponent(status)}`);
+}
+
+export async function confirmFpoFarm(farmId) {
+  return post(`${PY}/fpo/confirm/${encodeURIComponent(farmId)}`, {});
+}
+
+export async function reviewFpoFarm(farmId, action, notes = '') {
+  return post(`${PY}/fpo/review/${encodeURIComponent(farmId)}`, { action, notes });
 }
 
 // ── Marketplace ──

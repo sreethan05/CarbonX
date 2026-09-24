@@ -145,9 +145,8 @@ SUPABASE_URL=https://rbdyzeuucgqkhlikbpnd.supabase.co
 SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 GEE_PROJECT=carbonsetu-496709
-TWILIO_ACCOUNT_SID=<sid>
-TWILIO_AUTH_TOKEN=<token>
-TWILIO_PHONE_NUMBER=<twilio-number>
+TEXTPLATE_API_TOKEN=<textplate-token>
+TEXTPLATE_TEMPLATE_ID=<textplate-template-id>
 ```
 
 Schema is already applied (`profiles`, `farms`, `marketplace_listings`, `otp_codes`).
@@ -182,7 +181,7 @@ Proxies: `/py-api` → Python :8000, `/bc-api` → Node :3001.
 
 ## Flow
 
-1. Register / login (phone OTP delivered through Twilio).
+1. Register / login (phone OTP delivered through Textplate).
 2. **Farm map** — GEE satellite tiles + place search + draw → **Scan AI** (Sentinel-2 via Earth Engine + biodiversity ML).
 3. **Dashboard** — combined carbon + biodiversity credits per farm.
 4. **Create listing** — mint (blockchain) + save listing (Supabase).

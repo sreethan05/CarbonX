@@ -1,9 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, AlertTriangle, ShieldCheck, Compass, Info, Check, Edit3, X } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import LeafletMap from '../components/LeafletMap';
 import { useAuth } from '../context/AuthContext';
+
+function geojsonToLatLngs(geojson) {
+  try {
+    const geom = geojson?.geometry || geojson;
+    const ring = geom?.coordinates?.[0];
+    if (!Array.isArray(ring) || ring.length < 3) return null;
+    const pts = ring.map(([lng, lat]) => [Number(lat), Number(lng)]).filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln));
+    return pts.length >= 3 ? pts : null;
+  } catch {
+    return null;
+  }
+}
+
+function centroidOf(pts) {
+  if (!pts || pts.length === 0) return null;
+  const lat = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const lng = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  return [lat, lng];
+}
 
 export default function FarmMapRegistration() {
   const navigate = useNavigate();
@@ -19,6 +38,18 @@ export default function FarmMapRegistration() {
   const tierCode = navState.tierCode || (surveyNumber === '124/A' ? '1A' : surveyNumber === '124/B' ? '1B' : '2');
   const initialBadge = navState.tier || (tierCode === '1A' ? 'REGISTRY' : tierCode === '1B' ? 'REGISTRY_DOC' : 'DOCUMENT');
   const isReadOnly = tierCode === '1A';
+  const verified = navState.verified === true;
+
+  // Exact location from verification: registry geometry wins for Tier 1A,
+  // Pahani/doc polygon wins for Tier 1B / Tier 2. The map flies to it and
+  // marks the exact coordinates.
+  const mapInitialPoints = useMemo(() => geojsonToLatLngs(navState.geojson), [navState.geojson]);
+  const mapCentroid = useMemo(() => centroidOf(mapInitialPoints), [mapInitialPoints]);
+  const geometrySource = navState.geojson?.properties?.source === 'pahani'
+    ? 'Pahani document'
+    : navState.geojson
+      ? 'Govt cadastral registry'
+      : null;
 
   // Live calculated state from map drawing
   const [drawnAreaHa, setDrawnAreaHa] = useState(registryAreaHa);
@@ -110,6 +141,23 @@ export default function FarmMapRegistration() {
       {/* Main Map Workspace */}
       <div className="flex-1 p-4 md:p-6 space-y-4 max-w-6xl mx-auto w-full">
 
+        {/* Verified location banner — exact coordinates from registry / doc */}
+        {mapCentroid && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-900 flex items-start gap-3 shadow-xs">
+            <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold">
+                {verified ? 'Verified' : 'Located'} — Survey {surveyNumber} marked at exact {geometrySource || 'record'} coordinates
+              </h3>
+              <p className="text-[11px] mt-0.5 font-mono">
+                {mapCentroid[0].toFixed(5)}, {mapCentroid[1].toFixed(5)}
+                {mapInitialPoints ? ` · ${mapInitialPoints.length} boundary vertices` : ''}
+                {isReadOnly ? ' · locked cadastral boundary (Tier 1A)' : ' · confirm or redraw to match field bunds'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Mismatch Advisory Warning (Dismissible & Non-Blocking!) */}
         {!isWithinTolerance && showAdvisory && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 flex items-start justify-between gap-3 shadow-xs">
@@ -136,6 +184,10 @@ export default function FarmMapRegistration() {
         <div className="z-0 relative h-[520px] rounded-2xl overflow-hidden shadow-card border border-forest-100">
           <LeafletMap
             readOnly={isReadOnly}
+            initialPoints={mapInitialPoints}
+            center={mapCentroid}
+            placeLabel={`Survey ${surveyNumber} · ${village}`}
+            subLabel={`${ownerName} · ${registryAreaHa} ha · Tier ${tierCode}`}
             onAreaCalculated={handleAreaCalculated}
             showHeatmapToggle={true}
             height="100%"

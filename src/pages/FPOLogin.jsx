@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { loginFpo, sendOtp } from '../services/api';
 
 export default function FPOLogin() {
   const navigate = useNavigate();
@@ -18,11 +19,13 @@ export default function FPOLogin() {
   const [selectedFpo, setSelectedFpo] = useState(telanganaFpos[0]);
   const [phone, setPhone] = useState('9876543210');
   const [showOtp, setShowOtp] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [devOtp, setDevOtp] = useState(null);
 
   const inputRefs = useRef([]);
 
@@ -38,16 +41,71 @@ export default function FPOLogin() {
     return () => clearInterval(timer);
   }, [showOtp, countdown]);
 
-  const handleSendOtpSubmit = (e) => {
+  const handleSendOtpSubmit = async (e) => {
     e.preventDefault();
     if (phone.length < 10) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
     setError('');
-    setShowOtp(true);
-    setCountdown(60);
-    setCanResend(false);
+    setIsSendingOtp(true);
+    setDevOtp(null);
+
+    try {
+      // FPO officers may not be in the farmer DB; use the generic send-otp endpoint.
+      const res = await sendOtp(phone);
+
+      if (!res.success) {
+        setError(res.message || 'Failed to send OTP. Please try again.');
+        return;
+      }
+
+      if (res.dev_otp) {
+        setDevOtp(res.dev_otp);
+        // auto-fill the 6 boxes
+        setOtpDigits(res.dev_otp.split(''));
+      } else {
+        setOtpDigits(['', '', '', '', '', '']);
+      }
+
+      setShowOtp(true);
+      setCountdown(60);
+      setCanResend(false);
+    } catch {
+      setError('Could not reach the OTP service. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!canResend) return;
+    setError('');
+    setIsSendingOtp(true);
+    setDevOtp(null);
+
+    try {
+      const res = await sendOtp(phone);
+
+      if (!res.success) {
+        setError(res.message || 'Failed to resend OTP. Please try again.');
+        return;
+      }
+
+      if (res.dev_otp) {
+        setDevOtp(res.dev_otp);
+        setOtpDigits(res.dev_otp.split(''));
+      } else {
+        setOtpDigits(['', '', '', '', '', '']);
+      }
+
+      setCountdown(60);
+      setCanResend(false);
+    } catch {
+      setError('Could not resend OTP. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
   const handleDigitChange = (index, value) => {
@@ -66,15 +124,7 @@ export default function FPOLogin() {
     }
   };
 
-  const handleResendOtp = () => {
-    if (!canResend) return;
-    setCountdown(60);
-    setCanResend(false);
-    setOtpDigits(['1', '2', '3', '4', '5', '6']);
-    setError('');
-  };
-
-  const handleVerifyOtpSubmit = (e) => {
+  const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
     const fullOtp = otpDigits.join('');
     if (fullOtp.length !== 6) {
@@ -83,19 +133,20 @@ export default function FPOLogin() {
     }
 
     setIsVerifying(true);
-    setTimeout(() => {
-      setIsVerifying(false);
-      const fpoUserData = {
-        name: 'FPO Officer',
-        fpo_name: selectedFpo,
-        phone: phone,
-        district: selectedFpo.includes('Mothkur') ? 'Yadadri Bhuvanagiri' : selectedFpo.includes('Wardhannapet') ? 'Warangal' : 'Jangaon',
-        role: 'fpo'
-      };
-
-      login('cx_fpo_token_' + Date.now(), fpoUserData);
+    setError('');
+    try {
+      const fpoRes = await loginFpo(phone, selectedFpo, fullOtp);
+      if (!fpoRes.success) {
+        setError(fpoRes.message || 'Invalid OTP. Please try again.');
+        return;
+      }
+      await login(fpoRes.token, fpoRes.user);
       navigate('/fpo/dashboard');
-    }, 500);
+    } catch {
+      setError('Could not reach the FPO authentication service.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -161,14 +212,20 @@ export default function FPOLogin() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                disabled={isSendingOtp}
+                className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <span>Send Officer 6-Digit OTP</span>
+                <span>{isSendingOtp ? 'Sending OTP...' : 'Send Officer 6-Digit OTP'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+              {devOtp && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-xs text-amber-800 font-mono font-bold text-center">
+                  🔧 Dev mode — SMS not sent. OTP: <span className="text-lg tracking-widest">{devOtp}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1.5 text-center">
                   Enter 6-Digit Officer Verification Code
