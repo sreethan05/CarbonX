@@ -55,40 +55,108 @@ def _normalize_mobile(phone: str) -> str:
     return f"+91{digits}" if len(digits) == 10 else digits
 
 
-def send_phone_otp(phone: str, otp: str) -> bool:
-    """Send OTP via Textplate. Returns True on accepted, False otherwise."""
-    cfg = _config()
-    mobile = _normalize_mobile(phone)
-    print(f"[TEXTPLATE] sending mobileNumber={mobile!r}")
-    if not re.fullmatch(r"\+91\d{10}", mobile):
-        print(f"[SMS ERROR] Invalid mobile number: {phone}")
-        return False
-    if not sms_configured():
-        print(f"[DEV MODE] Textplate not configured. OTP for {mobile}: {otp}")
-        return False
+def _twilio_configured() -> bool:
+    sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    return not _is_placeholder(sid) and not _is_placeholder(token)
+
+
+def _send_twilio_otp(phone: str, otp: str) -> tuple[bool, str]:
     try:
-        import requests
+        from twilio.rest import Client
+        sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+        token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+        from_num = os.getenv("TWILIO_PHONE_NUMBER", "").strip()
+        client = Client(sid, token)
 
-        resp = requests.post(
-            TEXTPLATE_URL,
-            headers={"Authorization": f"Bearer {cfg['token']}"},
-            files={},
-            data={
-                "mobileNumber": mobile,
-                "templateId": cfg["template_id"],
-                "otpValue": str(otp),
-                "expiryValue": str(cfg["expiry"]),
-                "detailValue": str(cfg["detail"]),
-            },
-            timeout=15,
+        if not from_num or _is_placeholder(from_num):
+            numbers = client.incoming_phone_numbers.list(limit=1)
+            if numbers:
+                from_num = numbers[0].phone_number
+
+        if not from_num:
+            return False, "No active Twilio sender phone number found on account."
+
+        mobile = phone if phone.startswith("+") else f"+91{phone[-10:]}"
+        msg = client.messages.create(
+            body=f"Your CarbonX verification code is: {otp}. Valid for 3 minutes. Do not share this code.",
+            from_=from_num,
+            to=mobile,
         )
-        ok = 200 <= resp.status_code < 300
-        print(f"[TEXTPLATE] send to {mobile}: HTTP {resp.status_code} ok={ok} body={resp.text[:300]}")
-        return ok
+        print(f"[TWILIO] SMS sent to {mobile}, SID: {msg.sid}")
+        return True, "OTP sent to your phone via SMS"
     except Exception as e:
-        print(f"[SMS ERROR] Textplate send failed for {mobile}: {e}")
-        return False
+        err_msg = str(e)
+        if "unverified" in err_msg.lower():
+            friendly_err = f"Twilio Trial: +91 {phone[-10:]} is not verified. Please add it to your Twilio Console (twilio.com/user/account/phone-numbers/verified) to receive live SMS."
+        else:
+            friendly_err = f"Twilio SMS failed: {err_msg[:120]}"
+        print(f"[TWILIO ERROR] {friendly_err}")
+        return False, friendly_err
 
 
-# Backwards-compat alias (old Twilio-era imports).
-twilio_ready = sms_configured
+def send_phone_otp(phone: str, otp: str) -> tuple[bool, str]:
+    """
+    Send OTP via configured provider (Twilio or Textplate).
+    Returns (success: bool, message: str).
+    """
+    clean_digits = re.sub(r"\D", "", phone or "")
+    if len(clean_digits) > 10:
+        clean_digits = clean_digits[-10:]
+    if len(clean_digits) != 10:
+        return False, "Enter a valid 10-digit phone number"
+
+    # 1. Prefer Twilio if configured in environment
+    if _twilio_configured():
+        return _send_twilio_otp(clean_digits, otp)
+
+    # 2. Fall back to Textplate if configured
+    if sms_configured():
+        cfg = _config()
+        mobile = f"+91{clean_digits}"
+        print(f"[TEXTPLATE] sending mobileNumber={mobile!r}")
+        try:
+            import requests
+
+            resp = requests.post(
+                TEXTPLATE_URL,
+                headers={"Authorization": f"Bearer {cfg['token']}"},
+                files={},
+                data={
+                    "mobileNumber": mobile,
+                    "templateId": cfg["template_id"],
+                    "otpValue": str(otp),
+                    "expiryValue": str(cfg["expiry"]),
+                    "detailValue": str(cfg["detail"]),
+                },
+                timeout=15,
+            )
+            content_type = resp.headers.get("content-type", "").lower()
+            if "text/html" in content_type or "<html" in resp.text.lower() or "imunify360" in resp.text.lower():
+                print(f"[SMS ERROR] Textplate gateway blocked by bot-protection (Imunify360). SMS not sent to {mobile}.")
+                return False, "Textplate gateway blocked by server firewall (Imunify360)."
+
+            if not (200 <= resp.status_code < 300):
+                print(f"[SMS ERROR] Textplate HTTP error {resp.status_code}: {resp.text[:200]}")
+                return False, f"Textplate returned HTTP {resp.status_code}"
+
+            try:
+                data = resp.json()
+                if isinstance(data, dict) and (data.get("status") == "error" or data.get("error")):
+                    print(f"[SMS ERROR] Textplate API error: {data}")
+                    return False, str(data.get("message") or "Textplate dispatch failed")
+            except Exception:
+                pass
+
+            print(f"[TEXTPLATE] send to {mobile}: HTTP {resp.status_code} ok=True")
+            return True, "OTP sent to your phone via SMS"
+        except Exception as e:
+            print(f"[SMS ERROR] Textplate send failed for {mobile}: {e}")
+            return False, f"Textplate send error: {str(e)[:100]}"
+
+    # 3. No SMS provider configured
+    return False, "SMS provider not configured"
+
+
+# Backwards-compat alias
+twilio_ready = _twilio_configured

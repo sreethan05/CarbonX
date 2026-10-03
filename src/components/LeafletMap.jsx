@@ -3,13 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMapEvents
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Attempt to import turf for geodesic area calculations
-let turf = null;
-try {
-  turf = require('@turf/turf');
-} catch (e) {
-  // Turf loaded via ES module or fallback
-}
+import * as turf from '@turf/turf';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({

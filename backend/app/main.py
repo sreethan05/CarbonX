@@ -18,7 +18,7 @@ import re
 from datetime import datetime, timedelta, timezone
 import os
 
-from app.security import create_access_token, get_current_user, require_role
+from app.security import create_access_token, decode_token, get_current_user, require_role
 from app.phone_service import generate_otp, send_phone_otp
 from app import supabase_db as db
 from app import redis_store
@@ -252,13 +252,11 @@ def _user_response(user: dict, phone: str):
 def _send_otp_flow(phone: str):
     otp = generate_otp()
     _store_otp(phone, otp)
-    sms_sent = send_phone_otp(phone, otp)
+    sms_sent, msg = send_phone_otp(phone, otp)
     if sms_sent:
         return {"success": True, "message": "OTP sent to your phone via SMS"}
-    # SMS provider configured but send failed -> do NOT leak OTP.
-    if _sms_ready():
-        return {"success": False, "message": "Failed to send OTP SMS. Please retry."}
-    # Dev mode (no Textplate creds): expose OTP for local testing only.
+    if _sms_ready() or _twilio_ready():
+        return {"success": False, "message": msg}
     return {"success": True, "message": "OTP generated (dev mode)", "dev_otp": otp}
 
 

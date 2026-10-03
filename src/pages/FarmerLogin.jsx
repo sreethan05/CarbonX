@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { sendLoginOtp, loginUser } from '../services/api';
 
 export default function FarmerLogin() {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function FarmerLogin() {
 
   const [phone, setPhone] = useState('9876543210');
   const [showOtp, setShowOtp] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
@@ -29,16 +30,39 @@ export default function FarmerLogin() {
     return () => clearInterval(timer);
   }, [showOtp, countdown]);
 
-  const handleSendOtpSubmit = (e) => {
+  const handleSendOtpSubmit = async (e) => {
     e.preventDefault();
-    if (phone.length < 10) {
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    if (cleanPhone.length !== 10 || !/^\d+$/.test(cleanPhone)) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
     setError('');
-    setShowOtp(true);
-    setCountdown(60);
-    setCanResend(false);
+    setIsVerifying(true);
+    try {
+      const res = await sendLoginOtp(cleanPhone);
+      if (res.success) {
+        setShowOtp(true);
+        setCountdown(60);
+        setCanResend(false);
+        if (res.dev_otp) {
+          setOtpDigits(res.dev_otp.split(''));
+        }
+      } else {
+        setError(res.message || 'Failed to send OTP. Please retry.');
+      }
+    } catch {
+      if (import.meta.env.DEV) {
+        // Demo mode: continue the flow when no backend is running
+        setShowOtp(true);
+        setCountdown(60);
+        setCanResend(false);
+      } else {
+        setError('Could not reach the server. Please check your connection and retry.');
+      }
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const handleDigitChange = (index, value) => {
@@ -60,16 +84,24 @@ export default function FarmerLogin() {
     }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (!canResend) return;
     setCountdown(60);
     setCanResend(false);
-    setOtpDigits(['1', '2', '3', '4', '5', '6']);
     setError('');
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    try {
+      const res = await sendLoginOtp(cleanPhone);
+      if (res.dev_otp) setOtpDigits(res.dev_otp.split(''));
+      if (!res.success) setError(res.message || 'Could not resend OTP. Please retry.');
+    } catch {
+      setError('Could not resend OTP. Please retry.');
+    }
   };
 
-  const handleVerifyOtpSubmit = (e) => {
+  const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
     const fullOtp = otpDigits.join('');
     if (fullOtp.length !== 6) {
       setError('Please enter complete 6-digit OTP');
@@ -77,19 +109,38 @@ export default function FarmerLogin() {
     }
 
     setIsVerifying(true);
-    setTimeout(() => {
+    setError('');
+    try {
+      const res = await loginUser(cleanPhone, fullOtp);
+      if (res.success && res.token) {
+        await login(res.token, res.user);
+        navigate('/farmer/dashboard');
+        return;
+      }
+      setError(res.message || 'Invalid OTP. Please try again.');
       setIsVerifying(false);
-      const userData = {
-        name: 'K. Ramesh',
-        phone: phone,
-        district: 'Yadadri Bhuvanagiri',
-        village: 'Pochampally',
-        role: 'farmer',
-      };
+      return;
+    } catch (err) {
+      console.warn('Backend login unavailable', err);
+    }
 
-      login('cx_token_' + Date.now(), userData);
-      navigate('/farmer/dashboard');
-    }, 500);
+    if (!import.meta.env.DEV) {
+      setError('Could not reach the server. Please check your connection and retry.');
+      setIsVerifying(false);
+      return;
+    }
+
+    // Demo mode fallback (dev builds only): backend unreachable
+    const userData = {
+      name: 'K. Ramesh',
+      phone: cleanPhone,
+      district: 'Yadadri Bhuvanagiri',
+      village: 'Pochampally',
+      role: 'farmer',
+    };
+
+    await login('cx_token_' + Date.now(), userData);
+    navigate('/farmer/dashboard');
   };
 
   return (

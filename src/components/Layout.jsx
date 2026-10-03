@@ -68,11 +68,23 @@ export default function Layout({ children }) {
   const displayLocation = [user?.village, user?.district].filter(Boolean).join(', ');
   const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
-  const isPublicPage =
-    location.pathname === '/' ||
-    location.pathname === '/role-selection' ||
-    location.pathname === '/farmer-register' ||
-    location.pathname === '/farmer-login';
+  const publicRoutes = [
+    '/',
+    '/role-selection',
+    '/farmer/register',
+    '/farmer-register',
+    '/farmer/login',
+    '/farmer-login',
+    '/fpo/login',
+    '/fpo-login',
+    '/corporate/login',
+    '/corporate-login',
+    '/corporate/welcome',
+    '/corporate-welcome',
+    '/onboarding',
+    '/welcome-tutorial',
+  ];
+  const isPublicPage = publicRoutes.includes(location.pathname);
 
   const isActive = (path) => {
     if (location.pathname === path) return true;
@@ -84,7 +96,7 @@ export default function Layout({ children }) {
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   const goTo = (path) => { navigate(path); setSidebarOpen(false); };
-  const handleLogout = () => { logout(); navigate('/farmer-login'); };
+  const handleLogout = () => { logout(); navigate('/farmer/login'); };
 
   const renderNavItems = () => navItems.map((item) => {
     const active = isActive(item.path);
