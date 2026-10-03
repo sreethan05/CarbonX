@@ -1,43 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Sparkles, Sliders } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Sparkles, AlertTriangle } from 'lucide-react';
 import BadgePill from '../components/BadgePill';
 import { useAuth } from '../context/AuthContext';
+import { createMarketplaceListing } from '../services/api';
 
 export default function CreateListing() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, farms, refreshUser } = useAuth();
 
-  const [volume, setVolume] = useState(12.5);
+  const [volume, setVolume] = useState(1);
   const [unitPrice, setUnitPrice] = useState(340);
-  const [assignedBadge, setAssignedBadge] = useState('REGISTRY');
+  const [assignedBadge, setAssignedBadge] = useState('DOCUMENT');
+  const [selectedFarmId, setSelectedFarmId] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  // Pick the first verified farm with credits as the listing source
+  const sellableFarms = (farms || []).filter((f) => (f.total_credits || 0) > 0);
+
+  useEffect(() => {
+    refreshUser();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (sellableFarms.length > 0 && !selectedFarmId) {
+      setSelectedFarmId(sellableFarms[0].id);
+    }
+  }, [sellableFarms.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedFarm = sellableFarms.find((f) => f.id === selectedFarmId) || sellableFarms[0] || null;
+  const maxVolume = selectedFarm ? Math.max(parseFloat(selectedFarm.total_credits), 1) : 25;
+
+  useEffect(() => {
+    if (selectedFarm) {
+      setVolume(Math.min(volume, parseFloat(selectedFarm.total_credits) || 1));
+      if (selectedFarm.badge) setAssignedBadge(selectedFarm.badge);
+      if (selectedFarm.benchmark) setUnitPrice(selectedFarm.benchmark);
+    }
+  }, [selectedFarmId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live revenue calculations
   const grossValue = volume * unitPrice;
   const platformFee = grossValue * 0.02;
   const netEarnings = grossValue - platformFee;
 
-  const handleSubmitListing = (e) => {
+  const handleSubmitListing = async (e) => {
     e.preventDefault();
-    const newListing = {
-      id: `LST-NEW-${Date.now()}`,
-      crop: 'Cotton & Paddy',
-      farmer: user?.name || 'K. Ramesh',
-      location: `${user?.village || 'Pochampally'}, ${user?.district || 'Yadadri Bhuvanagiri'}`,
-      available: volume.toString(),
-      carbonScore: (volume * 0.6).toFixed(2),
-      bioScore: (volume * 0.4).toFixed(2),
-      price: unitPrice.toString(),
-      status: 'Active',
-      badge: assignedBadge,
-    };
-    try {
-      const existing = JSON.parse(localStorage.getItem('carbonx_custom_listings') || '[]');
-      localStorage.setItem('carbonx_custom_listings', JSON.stringify([newListing, ...existing]));
-    } catch (err) {
-      console.warn('Could not save custom listing', err);
+    setError('');
+    if (!selectedFarm) {
+      setError('No verified farm with credits found. Enroll and scan a parcel first.');
+      return;
     }
-    navigate('/marketplace');
+    setIsPublishing(true);
+    try {
+      const res = await createMarketplaceListing({
+        credits: volume,
+        price_per_credit: unitPrice,
+        farm_id: selectedFarm.id,
+        crop: selectedFarm.crop_type || 'Mixed Crop',
+      });
+      if (res && res.success) {
+        setSuccess(true);
+        refreshUser();
+        setTimeout(() => navigate('/marketplace'), 1200);
+      } else {
+        setError((res && res.message) || 'Failed to publish listing');
+      }
+    } catch (err) {
+      setError('Marketplace service unreachable. Is the backend running?');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -63,15 +98,48 @@ export default function CreateListing() {
           </button>
         </div>
 
+        {error && (
+          <p className="text-xs text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2.5 rounded-lg leading-relaxed flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+          </p>
+        )}
+
+        {success && (
+          <p className="text-xs text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" /> Listing published! Redirecting to the marketplace…
+          </p>
+        )}
+
         {/* Configuration Panel */}
         <form onSubmit={handleSubmitListing} className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-6">
           <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-4 rounded-xl">
             <div>
               <p className="text-xs font-bold text-slate-900">Verified Parcel Footprint</p>
-              <p className="text-[11px] text-slate-500">Survey 124/A (2.50 Acres Cotton Block)</p>
+              {selectedFarm ? (
+                <p className="text-[11px] text-slate-500">
+                  {selectedFarm.name} · {selectedFarm.area_hectares} ha · {selectedFarm.total_credits} credits available
+                </p>
+              ) : (
+                <p className="text-[11px] text-rose-700 font-semibold">No sellable farm found — enroll a parcel first</p>
+              )}
             </div>
             <BadgePill badge={assignedBadge} size="sm" />
           </div>
+
+          {sellableFarms.length > 1 && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Choose Farm</label>
+              <select
+                value={selectedFarmId}
+                onChange={(e) => setSelectedFarmId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              >
+                {sellableFarms.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name} — {f.total_credits} credits</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Interactive Volume Slider */}
           <div className="space-y-2">
@@ -81,8 +149,8 @@ export default function CreateListing() {
             </div>
             <input
               type="range"
-              min="1.0"
-              max="25.0"
+              min="0.5"
+              max={maxVolume}
               step="0.5"
               value={volume}
               onChange={(e) => setVolume(parseFloat(e.target.value))}
@@ -126,10 +194,11 @@ export default function CreateListing() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+            disabled={isPublishing || !selectedFarm}
+            className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Publish Listing to Public Marketplace</span>
+            <span>{isPublishing ? 'Publishing…' : 'Publish Listing to Public Marketplace'}</span>
           </button>
         </form>
 

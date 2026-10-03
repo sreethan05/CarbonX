@@ -131,8 +131,94 @@ export async function createMarketplaceListing(payload) {
   return post(`${PY}/marketplace/listings`, payload);
 }
 
-export async function placeListingBid(listingId) {
-  return post(`${PY}/marketplace/listings/${listingId}/bid`, {});
+export async function placeListingBid(listingId, bidAmount, bidderName) {
+  return post(`${PY}/marketplace/listings/${listingId}/bid`, { bid_amount: bidAmount, bidder_name: bidderName });
+}
+
+export async function buyCredits(payload) {
+  return post(`${PY}/marketplace/buy`, payload);
+}
+
+export async function autoMatchCredits(targetVolume, priority = 'lowest_price') {
+  return post(`${PY}/marketplace/auto-match`, { target_volume: targetVolume, priority });
+}
+
+// ── Certificates & wallet ──
+
+export async function getWallet() {
+  return get(`${PY}/wallet`);
+}
+
+export async function getCertificates() {
+  return get(`${PY}/certificates`);
+}
+
+export async function retireCertificate(certId, scope) {
+  const qs = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+  return post(`${PY}/certificates/${certId}/retire${qs}`, {});
+}
+
+// ── Farm passport & history ──
+
+export async function getFarmPassport(farmId) {
+  return get(`${PY}/passport/${farmId}`);
+}
+
+export async function getNdviHistory(farmId) {
+  return get(`${PY}/farm/${farmId}/ndvi-history`);
+}
+
+// ── FPO ──
+
+export async function fpoLogin(registrationNo, password) {
+  return post(`${PY}/fpo/login`, { registration_no: registrationNo, password });
+}
+
+export async function getFpos() {
+  return get(`${PY}/fpos`);
+}
+
+export async function getFpoFarmers() {
+  return get(`${PY}/fpo/farmers`);
+}
+
+export async function getFpoPending() {
+  return get(`${PY}/fpo/pending`);
+}
+
+export async function getFpoFlagged() {
+  return get(`${PY}/fpo/flagged`);
+}
+
+export async function fpoOnboardFarmer(payload) {
+  return post(`${PY}/fpo/onboard`, payload);
+}
+
+export async function fpoConfirmFarm(farmId) {
+  return post(`${PY}/fpo/confirm/${farmId}`, {});
+}
+
+export async function fpoReviewFarm(farmId, payload) {
+  return post(`${PY}/fpo/review/${farmId}`, payload);
+}
+
+// ── Corporate ──
+
+export async function corporateLogin(name, password) {
+  return post(`${PY}/corporate/login`, { name, password });
+}
+
+// ── Documents ──
+
+export async function parsePahaniDocument(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${PY}/documents/parse-pahani`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: form,
+  });
+  return res.json();
 }
 
 // ── Blockchain ──

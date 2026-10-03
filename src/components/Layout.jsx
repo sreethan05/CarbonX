@@ -13,7 +13,7 @@ const ROLE_NAV = {
   farmer: [
     { name: 'Dashboard', path: '/farmer/dashboard', icon: Home },
     { name: 'Land Verification', path: '/farmer/land-verification', icon: ShieldCheck },
-    { name: 'Carbon Passport', path: '/farmer/passport/TEL-124A', icon: Compass },
+    { name: 'Carbon Passport', path: '/farm-analytics', icon: Compass },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Wallet & UPI Ledger', path: '/farmer/wallet', icon: Wallet },
     { name: 'Support', path: '/support', icon: ClipboardList },
@@ -28,7 +28,7 @@ const ROLE_NAV = {
     { name: 'ESG Dashboard', path: '/corporate/dashboard', icon: Home },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingCart },
     { name: 'Bulk Auto-Match', path: '/marketplace/checkout', icon: BarChart3 },
-    { name: 'Certificates', path: '/buyer/certificates/CX-2026-CERT-00123', icon: ShieldCheck },
+    { name: 'Certificates', path: '/corporate/dashboard', icon: ShieldCheck },
     { name: 'Support', path: '/support', icon: ClipboardList },
   ],
   verifier: [

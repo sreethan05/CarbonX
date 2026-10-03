@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, ArrowRight, ShieldCheck, RefreshCw, KeyRound, Lock, CheckCircle2 } from 'lucide-react';
+import { Building2, ArrowRight, ShieldCheck, Lock, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { corporateLogin } from '../services/api';
 
 export default function CorporateLogin() {
   const navigate = useNavigate();
@@ -9,54 +10,9 @@ export default function CorporateLogin() {
 
   const [name, setName] = useState('Telangana Sustainable Agro Pvt Ltd');
   const [password, setPassword] = useState('Corporate@2026');
-  const [useOtpToggle, setUseOtpToggle] = useState(false);
-  
-  // OTP step state if toggle enabled
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['1', '2', '3', '4', '5', '6']);
-  const [countdown, setCountdown] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-  
+
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-
-  const inputRefs = useRef([]);
-
-  useEffect(() => {
-    let timer;
-    if (showOtp && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    } else if (countdown === 0) {
-      setCanResend(true);
-    }
-    return () => clearInterval(timer);
-  }, [showOtp, countdown]);
-
-  const handleDigitChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return;
-    const newDigits = [...otpDigits];
-    newDigits[index] = value.slice(-1);
-    setOtpDigits(newDigits);
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleResendOtp = () => {
-    if (!canResend) return;
-    setCountdown(60);
-    setCanResend(false);
-    setOtpDigits(['1', '2', '3', '4', '5', '6']);
-    setError('');
-  };
 
   const handleCorporateLogin = async (e) => {
     if (e) e.preventDefault();
@@ -66,49 +22,30 @@ export default function CorporateLogin() {
     }
     setError('');
 
-    if (useOtpToggle && !showOtp) {
-      setShowOtp(true);
-      setCountdown(60);
-      setCanResend(false);
-      return;
-    }
-
     setIsVerifying(true);
 
     try {
-      // Attempt backend authentication
-      const response = await fetch('/py-api/corporate/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, password })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        login(data.token || 'cx_corp_token_' + Date.now(), {
-          c_id: data.c_id || 101,
-          name: data.name || name,
-          role: 'buyer'
-        });
+      const data = await corporateLogin(name, password);
+      if (data && data.success && data.token) {
+        await login(data.token, data.user);
         setIsVerifying(false);
         navigate('/corporate/dashboard');
         return;
       }
-    } catch (err) {
-      console.warn('Backend corporate login API offline, using fallback auth', err);
-    }
-
-    // Fallback simulated authentication
-    setTimeout(() => {
+      setError((data && data.message) || 'Login failed. Check your credentials.');
       setIsVerifying(false);
-      const corporateUser = {
-        c_id: 101,
-        name: name,
-        role: 'buyer',
-        email: 'esg@telanganasustainable.com'
-      };
-      login('cx_corp_token_' + Date.now(), corporateUser);
-      navigate('/corporate/dashboard');
-    }, 600);
+    } catch (err) {
+      console.warn('Corporate login API unreachable', err);
+      if (import.meta.env.DEV) {
+        // Demo mode (dev builds only): proceed with a locally-forged session
+        await login('cx_corp_token_' + Date.now(), { c_id: 101, name, role: 'buyer' });
+        setIsVerifying(false);
+        navigate('/corporate/dashboard');
+        return;
+      }
+      setError('Authentication service unreachable. Please try again shortly.');
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -139,112 +76,40 @@ export default function CorporateLogin() {
             </p>
           )}
 
-          {!showOtp ? (
-            <form onSubmit={handleCorporateLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Corporate Name / Identifier (`name`)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Telangana Sustainable Agro Pvt Ltd"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
-                />
-              </div>
+          <form onSubmit={handleCorporateLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Corporate Name / Identifier (`name`)</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Telangana Sustainable Agro Pvt Ltd"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Corporate Password (`password`)</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Corporate Password (`password`)</label>
+              <input
+                type="password"
+                required
+                placeholder="••••••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
 
-              {/* 2FA Secondary OTP Toggle Option */}
-              <div className="flex items-center justify-between bg-[#F8FAF8] border border-slate-200 rounded-xl p-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="w-4 h-4 text-emerald-700" />
-                  <span className="font-semibold text-slate-700">Require Secondary OTP Verification</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={useOtpToggle}
-                  onChange={(e) => setUseOtpToggle(e.target.checked)}
-                  className="accent-emerald-700 w-4 h-4 cursor-pointer"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isVerifying}
-                className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
-              >
-                <span>{useOtpToggle ? 'Proceed to 2FA Secondary OTP' : 'Sign In to Corporate ESG Desk'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleCorporateLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5 text-center">
-                  Enter 6-Digit Secondary Corporate OTP
-                </label>
-                <div className="flex justify-between gap-1.5 max-w-xs mx-auto">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => (inputRefs.current[idx] = el)}
-                      type="text"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(idx, e)}
-                      className="w-10 h-12 text-center text-lg font-mono font-bold bg-[#F8FAF8] border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/40"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center bg-[#F8FAF8] border border-slate-200 rounded-xl p-2.5 text-xs text-slate-600">
-                <span>
-                  {canResend ? (
-                    <span className="text-slate-800 font-semibold">Didn't receive code?</span>
-                  ) : (
-                    <span>
-                      Resend code in <strong className="font-mono text-emerald-800 font-bold">{countdown}s</strong>
-                    </span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={!canResend}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                    canResend
-                      ? 'bg-[#1B4332] text-white hover:bg-[#2D6A4F] shadow-xs'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Resend OTP</span>
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isVerifying}
-                className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <span>{isVerifying ? 'Authenticating Corporate...' : 'Verify Corporate Credentials'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-          )}
+            <button
+              type="submit"
+              disabled={isVerifying}
+              className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>{isVerifying ? 'Authenticating Corporate...' : 'Sign In to Corporate ESG Desk'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
 
           <div className="text-center pt-2 border-t border-slate-100">
             <p className="text-xs text-slate-500">

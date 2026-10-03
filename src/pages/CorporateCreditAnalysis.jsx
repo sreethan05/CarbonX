@@ -1,35 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Layers, ShieldCheck, ArrowRight, CheckCircle2, Building, Hash } from 'lucide-react';
+import { Sparkles, Layers, ArrowRight, CheckCircle2, Building, Loader2, AlertTriangle } from 'lucide-react';
 import BadgePill from '../components/BadgePill';
+import { useAuth } from '../context/AuthContext';
+import { autoMatchCredits, buyCredits } from '../services/api';
 
 export default function CorporateCreditAnalysis() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Bulk Auto-Match Engine State
   const [targetVolume, setTargetVolume] = useState(100);
   const [priority, setPriority] = useState('lowest_price'); // nearest, highest_ndvi, lowest_price
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
+  const [isMatching, setIsMatching] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [matchError, setMatchError] = useState('');
+  const [payError, setPayError] = useState('');
+  const [lastCertId, setLastCertId] = useState(null);
 
-  // Greedy Fill Matched Parcels
-  const matchedParcels = [
-    { farm: 'Sri Venkateswara Organic Farm', farmer: 'Venkat Rao', survey: '124/A', credits: 78.0, rate: 340, badge: 'REGISTRY' },
-    { farm: 'Godavari Maize Plot', farmer: 'Venkat Rao', survey: '124/B', credits: 22.0, rate: 320, badge: 'REGISTRY_DOC' }
-  ];
+  // Greedy fill matched parcels from the live auto-match API
+  const [matchedParcels, setMatchedParcels] = useState([]);
 
-  const totalMatchedCredits = matchedParcels.reduce((acc, item) => acc + item.credits, 0);
-  const grossValue = matchedParcels.reduce((acc, item) => acc + item.credits * item.rate, 0);
+  const runAutoMatch = async () => {
+    setIsMatching(true);
+    setMatchError('');
+    try {
+      const data = await autoMatchCredits(targetVolume, priority);
+      if (data && data.success) {
+        setMatchedParcels(data.matched_farms || []);
+      } else {
+        setMatchError((data && data.message) || 'Auto-match failed');
+        setMatchedParcels([]);
+      }
+    } catch (e) {
+      setMatchError('Auto-match service unreachable. Is the backend running?');
+      setMatchedParcels([]);
+    } finally {
+      setIsMatching(false);
+    }
+  };
+
+  useEffect(() => { runAutoMatch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalMatchedCredits = matchedParcels.reduce((acc, item) => acc + (item.credits || 0), 0);
+  const grossValue = matchedParcels.reduce((acc, item) => acc + (item.credits || 0) * (item.rate || 0), 0);
   const facilitationFee = grossValue * 0.02;
   const netFarmerEscrow = grossValue - facilitationFee;
 
-  const handleExecutePayment = () => {
-    setPaymentDone(true);
-    setTimeout(() => {
-      setShowCheckoutModal(false);
-      setPaymentDone(false);
-      navigate('/buyer/certificates/CX-2026-CERT-00123');
-    }, 2000);
+  const handleExecutePayment = async () => {
+    setIsPaying(true);
+    setPayError('');
+    try {
+      // Execute real escrow purchases for each allocated parcel
+      let lastCert = null;
+      for (const parcel of matchedParcels) {
+        if (!parcel.listing_id || (parcel.credits || 0) <= 0) continue;
+        const res = await buyCredits({
+          listing_id: parcel.listing_id,
+          credits: parcel.credits,
+          unit_price: parcel.rate,
+          buyer_name: user?.name || 'Corporate Buyer',
+        });
+        if (res && res.certificate_id) {
+          lastCert = res.certificate_id;
+        } else if (res && res.message) {
+          console.warn(`Purchase skipped for ${parcel.farm}: ${res.message}`);
+        }
+      }
+      if (lastCert) {
+        setLastCertId(lastCert);
+        setPaymentDone(true);
+        setTimeout(() => {
+          setShowCheckoutModal(false);
+          setPaymentDone(false);
+          navigate(`/buyer/certificates/${lastCert}`);
+        }, 1800);
+      } else {
+        setPayError('No purchases completed — the matched parcels may no longer be available. Re-run the auto-match.');
+      }
+    } catch (e) {
+      setPayError('Payment execution failed. Please try again.');
+    } finally {
+      setIsPaying(false);
+    }
   };
 
   return (
@@ -85,8 +140,22 @@ export default function CorporateCreditAnalysis() {
                 <option value="highest_ndvi">Highest Sentinel-2 NDVI Biomass Density</option>
                 <option value="nearest">Nearest Spatial Centroid (Telangana Mandals)</option>
               </select>
+              <button
+                onClick={runAutoMatch}
+                disabled={isMatching}
+                className="mt-3 w-full py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] disabled:opacity-60 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+              >
+                {isMatching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-emerald-300" />}
+                <span>{isMatching ? 'Matching Live Listings…' : 'Run Auto-Match on Live Marketplace'}</span>
+              </button>
             </div>
           </div>
+
+          {matchError && (
+            <p className="text-xs text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2.5 rounded-lg flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" /> {matchError}
+            </p>
+          )}
 
           {/* Matched Farm Parcels Summary Table */}
           <div className="space-y-3 pt-4 border-t border-slate-100">
@@ -98,7 +167,7 @@ export default function CorporateCreditAnalysis() {
                   <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
                     <th className="py-2.5 px-4">Matched Farm Parcel</th>
                     <th className="py-2.5 px-4">Farmer</th>
-                    <th className="py-2.5 px-4">Survey</th>
+                    <th className="py-2.5 px-4">Location</th>
                     <th className="py-2.5 px-4">Badge</th>
                     <th className="py-2.5 px-4">Allocated Volume</th>
                     <th className="py-2.5 px-4">Unit Rate</th>
@@ -106,21 +175,29 @@ export default function CorporateCreditAnalysis() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {matchedParcels.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-4 font-bold text-slate-900">{item.farm}</td>
-                      <td className="py-2.5 px-4 text-slate-700">{item.farmer}</td>
-                      <td className="py-2.5 px-4 font-mono text-slate-600">{item.survey}</td>
-                      <td className="py-2.5 px-4">
-                        <BadgePill badge={item.badge} size="sm" />
-                      </td>
-                      <td className="py-2.5 px-4 font-bold text-emerald-800">{item.credits} MT</td>
-                      <td className="py-2.5 px-4 text-slate-900">INR {item.rate}</td>
-                      <td className="py-2.5 px-4 font-extrabold text-slate-900">
-                        INR {(item.credits * item.rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {matchedParcels.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-6 px-4 text-center text-slate-500">
+                        {isMatching ? 'Matching live listings…' : 'No active listings matched this target. Lower the volume or check back later.'}
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    matchedParcels.map((item, idx) => (
+                      <tr key={item.listing_id || idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-4 font-bold text-slate-900">{item.farm}</td>
+                        <td className="py-2.5 px-4 text-slate-700">{item.farmer}</td>
+                        <td className="py-2.5 px-4 font-mono text-slate-600">{item.survey || '—'}</td>
+                        <td className="py-2.5 px-4">
+                          <BadgePill badge={item.badge} size="sm" />
+                        </td>
+                        <td className="py-2.5 px-4 font-bold text-emerald-800">{item.credits} MT</td>
+                        <td className="py-2.5 px-4 text-slate-900">INR {item.rate}</td>
+                        <td className="py-2.5 px-4 font-extrabold text-slate-900">
+                          INR {((item.credits || 0) * (item.rate || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -159,7 +236,8 @@ export default function CorporateCreditAnalysis() {
 
           <button
             onClick={() => setShowCheckoutModal(true)}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 mt-4"
+            disabled={matchedParcels.length === 0 || isMatching}
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 mt-4"
           >
             <span>Proceed to Payment Gateway Simulation</span>
             <ArrowRight className="w-4 h-4" />
@@ -181,14 +259,20 @@ export default function CorporateCreditAnalysis() {
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-4 rounded-xl text-center space-y-2">
                   <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
                   <p className="font-bold text-sm">Escrow Settlement Executed!</p>
-                  <p className="text-xs text-slate-600 font-mono">TX Hash: 0x7f9a883ce42b91028471abc882</p>
+                  <p className="text-xs text-slate-600 font-mono">Certificate: {lastCertId}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-xs">
                     <p className="font-semibold text-slate-700">Gross Procurement Amount: <strong className="text-slate-900">INR {grossValue.toLocaleString()}</strong></p>
-                    <p className="text-[11px] text-slate-500">Includes 2% CarbonX facilitation fee split.</p>
+                    <p className="text-[11px] text-slate-500">
+                      Executes {matchedParcels.length} real escrow purchase{matchedParcels.length === 1 ? '' : 's'} against live listings.
+                    </p>
                   </div>
+
+                  {payError && (
+                    <p className="text-xs text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2.5 rounded-lg">{payError}</p>
+                  )}
 
                   <div className="flex gap-2 pt-2">
                     <button
@@ -201,10 +285,10 @@ export default function CorporateCreditAnalysis() {
                     <button
                       type="button"
                       onClick={handleExecutePayment}
-                      className="flex-1 py-2.5 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 flex items-center justify-center gap-1"
+                      disabled={isPaying}
+                      className="flex-1 py-2.5 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 disabled:opacity-60 flex items-center justify-center gap-1"
                     >
-                      <span>Simulate RTGS Payout</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      {isPaying ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Execute Escrow Purchase</span>}
                     </button>
                   </div>
                 </div>

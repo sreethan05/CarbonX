@@ -40,6 +40,8 @@ export default function FarmMapRegistration() {
     }
   }, [drawnAreaHa, registryAreaHa, isWithinTolerance, tierCode, initialBadge]);
 
+  const [parcelGeojson, setParcelGeojson] = useState(null);
+
   const handleAreaCalculated = (res) => {
     if (res && res.area > 0) {
       setDrawnAreaHa(res.area);
@@ -47,17 +49,22 @@ export default function FarmMapRegistration() {
   };
 
   const handleFinalSubmit = () => {
-    navigate('/farm-details', {
-      state: {
-        surveyNumber,
-        ownerName,
-        village,
-        areaHa: drawnAreaHa,
-        badge: assignedBadge,
-        tierCode,
-        flaggedForFpo: !isWithinTolerance
-      }
-    });
+    const parcel = {
+      surveyNumber,
+      ownerName,
+      village,
+      areaHa: drawnAreaHa,
+      badge: assignedBadge,
+      tierCode,
+      flaggedForFpo: !isWithinTolerance,
+      geojson: parcelGeojson,
+    };
+    try {
+      localStorage.setItem('carbonx_farm_parcel', JSON.stringify(parcel));
+    } catch (err) {
+      console.warn('Could not persist parcel', err);
+    }
+    navigate('/farm-details', { state: parcel });
   };
 
   return (
@@ -136,6 +143,7 @@ export default function FarmMapRegistration() {
         <div className="z-0 relative h-[520px] rounded-2xl overflow-hidden shadow-card border border-forest-100">
           <LeafletMap
             readOnly={isReadOnly}
+            onGeojsonDrawn={setParcelGeojson}
             onAreaCalculated={handleAreaCalculated}
             showHeatmapToggle={true}
             height="100%"

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MapPin, Calendar, ShoppingCart, CheckCircle2, ChevronRight, PlusCircle, Minus, Plus, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getMarketplaceListings, buyCredits } from '../services/api';
 
 export default function Marketplace() {
   const navigate = useNavigate();
@@ -81,38 +82,35 @@ export default function Marketplace() {
   ];
 
   const [listings, setListings] = useState(defaultListings);
+  const [dataSource, setDataSource] = useState('fallback');
 
   useEffect(() => {
     async function loadListings() {
       setIsLoading(true);
       try {
-        const custom = JSON.parse(localStorage.getItem('carbonx_custom_listings') || '[]');
-        const res = await fetch('/py-api/marketplace/listings?limit=50');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.listings) && data.listings.length > 0) {
-            const mapped = data.listings.map((l, idx) => ({
-              id: l.id || `LST-DB-${idx}`,
-              crop: l.crop || 'Paddy',
-              farmer: l.farmer_name || 'Marketplace Farmer',
-              location: l.location || 'Telangana',
-              available: (l.total_credits || l.carbon_credits || 1.0).toString(),
-              carbonScore: (l.carbon_credits || 0.5).toString(),
-              bioScore: (l.biodiversity_credits || 0.5).toString(),
-              price: (l.price_per_credit || 340).toString(),
-              status: l.status || 'Active',
-              badge: l.size_label === 'Large' ? 'REGISTRY' : l.size_label === 'Medium' ? 'REGISTRY_DOC' : 'DOCUMENT',
-              imageUrl: l.image_url
-            }));
-            setListings([...custom, ...mapped]);
-            return;
-          }
+        const data = await getMarketplaceListings({ limit: 50 });
+        if (data && data.success && Array.isArray(data.listings) && data.listings.length > 0) {
+          const mapped = data.listings.map((l, idx) => ({
+            id: l.id || `LST-DB-${idx}`,
+            crop: l.crop || 'Paddy',
+            farmer: l.farmer_name || 'Marketplace Farmer',
+            location: l.location || 'Telangana',
+            available: (l.total_credits || l.carbon_credits || 1.0).toString(),
+            carbonScore: (l.carbon_credits || 0.5).toString(),
+            bioScore: (l.biodiversity_credits || 0.5).toString(),
+            price: (l.price_per_credit || 340).toString(),
+            status: l.status || 'Active',
+            badge: l.badge || (l.size_label === 'Large' ? 'REGISTRY' : l.size_label === 'Medium' ? 'REGISTRY_DOC' : 'DOCUMENT'),
+            imageUrl: l.image_url
+          }));
+          setListings(mapped);
+          setDataSource(data.source || 'live_db');
+          return;
         }
-        if (custom.length > 0) {
-          setListings([...custom, ...defaultListings]);
-        }
+        setDataSource('fallback');
       } catch (err) {
         console.warn('Could not fetch remote listings, using defaults', err);
+        setDataSource('fallback');
       } finally {
         setIsLoading(false);
       }
@@ -160,24 +158,19 @@ export default function Marketplace() {
     try {
       const qty = getQuantity(checkoutModalItem.id);
       const price = parseFloat(checkoutModalItem.price) || 340;
-      const res = await fetch('/py-api/marketplace/buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listing_id: checkoutModalItem.id,
-          credits: qty,
-          unit_price: price,
-          buyer_name: user?.name || 'Corporate Buyer'
-        })
+      const data = await buyCredits({
+        listing_id: checkoutModalItem.id,
+        credits: qty,
+        unit_price: price,
+        buyer_name: user?.name || 'Corporate Buyer'
       });
-      const data = res.ok ? await res.json() : null;
       if (data && data.certificate_id) {
         setCheckoutTxHash(data.tx_hash);
         setCheckoutCertId(data.certificate_id);
         finishPurchase(data.certificate_id);
         return;
       }
-      throw new Error((data && data.message) || `Purchase failed (HTTP ${res.status})`);
+      throw new Error((data && data.message) || 'Purchase failed');
     } catch (err) {
       console.warn('Purchase API unavailable', err);
       if (import.meta.env.DEV) {
@@ -186,7 +179,7 @@ export default function Marketplace() {
         finishPurchase('CX-2026-CERT-00123');
         return;
       }
-      setCheckoutError('Purchase could not be completed. Please try again.');
+      setCheckoutError(err.message || 'Purchase could not be completed. Please try again.');
       setIsProcessing(false);
     }
   };
@@ -200,7 +193,14 @@ export default function Marketplace() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-2xl font-extrabold text-[#0F172A] font-manrope">Carbon Credit Marketplace</h1>
-              <p className="text-xs text-slate-500 mt-0.5">Direct agricultural carbon offset procurement from verified Telangana farms.</p>
+              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                Direct agricultural carbon offset procurement from verified Telangana farms.
+                {dataSource === 'fallback' && (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                    SAMPLE DATA (DB offline)
+                  </span>
+                )}
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">

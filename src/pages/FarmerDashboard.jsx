@@ -7,79 +7,55 @@ import { useAuth } from '../context/AuthContext';
 export default function FarmerDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, farms: realFarms, refreshUser } = useAuth();
+
+  React.useEffect(() => { refreshUser(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navState = location.state || {};
 
-  // Default farms dataset
-  const farms = [
-    {
-      id: 'TEL-124A',
-      surveyNumber: '124/A',
-      acres: 2.50,
-      crop: 'Cotton & Paddy',
-      badge: 'REGISTRY',
-      credits: 12.50,
-      earnings: 4250,
-      ndvi: 0.78,
-      status: 'VERIFIED'
-    },
-    {
-      id: 'TEL-124B',
-      surveyNumber: '124/B',
-      acres: 2.10,
-      crop: 'Cotton',
-      badge: 'REGISTRY_DOC',
-      credits: 9.80,
-      earnings: 3136,
-      ndvi: 0.72,
-      status: 'VERIFIED'
-    },
-    {
-      id: 'TEL-124C',
-      surveyNumber: '124/C',
-      acres: 1.80,
-      crop: 'Paddy',
-      badge: 'DOCUMENT',
-      credits: 7.20,
-      earnings: 2232,
-      ndvi: 0.68,
-      status: 'VERIFIED'
-    },
-    {
-      id: 'TEL-124D',
-      surveyNumber: '124/D',
-      acres: 2.20,
-      crop: 'Cotton',
-      badge: 'PENDING',
-      credits: 0,
-      earnings: 0,
-      ndvi: 0.54,
-      status: 'PENDING_REVIEW',
-      flagReason: 'Boundary overlap conflict detected — FPO attestation required'
-    }
-  ];
+  // Real farms from GET /me (Supabase), mapped to the dashboard's display shape
+  const farms = (realFarms || []).map((f, idx) => {
+    const status = String(f.status || 'PENDING').toLowerCase();
+    const flagged = status === 'flagged';
+    const pending = flagged || status === 'pending' || !f.badge;
+    return {
+      id: f.id,
+      surveyNumber: (f.name || `FARM-${idx + 1}`).replace(/^Survey /, ''),
+      acres: f.area_hectares || 0,
+      crop: f.crop_type || 'Mixed Crop',
+      badge: f.badge || 'DOCUMENT',
+      credits: f.total_credits || 0,
+      earnings: Math.round((f.total_credits || 0) * 340),
+      ndvi: f.ndvi || 0,
+      bioScore: f.biodiversity_score ? (f.biodiversity_score / 10).toFixed(1) : null,
+      status: status.toUpperCase(),
+      flagged,
+      isPending: pending,
+    };
+  });
 
   const [selectedFarmIndex, setSelectedFarmIndex] = useState(0);
 
   // If navigated with explicit farmer details state (e.g. from FPO Dashboard)
-  const farmerName = navState.farmerName || user?.name || 'K. Ramesh';
-  const village = navState.village || user?.village || 'Pochampally';
-  const district = navState.district || user?.district || 'Yadadri Bhuvanagiri';
+  const farmerName = navState.farmerName || user?.name || 'Farmer';
+  const village = navState.village || user?.village || 'Your village';
+  const district = navState.district || user?.district || 'Telangana';
 
-  const currentFarm = navState.surveyNumber ? {
-    id: `FARM-${navState.surveyNumber}`,
-    surveyNumber: navState.surveyNumber,
-    acres: navState.acres || 2.50,
-    crop: navState.crop || 'Cotton & Paddy',
-    badge: navState.badge || 'REGISTRY',
-    credits: navState.credits !== undefined ? navState.credits : 12.50,
-    earnings: (navState.credits || 12.50) * 340,
-    ndvi: 0.78,
-    status: navState.badge === 'PENDING' ? 'PENDING_REVIEW' : 'VERIFIED'
-  } : farms[selectedFarmIndex];
+  const currentFarm = farms[selectedFarmIndex] || {
+    id: null,
+    surveyNumber: '—',
+    acres: 0,
+    crop: '—',
+    badge: 'PENDING',
+    credits: 0,
+    earnings: 0,
+    ndvi: 0,
+    bioScore: null,
+    status: 'PENDING',
+    isPending: true,
+  };
 
-  const isPending = currentFarm.badge === 'PENDING';
+  const isPending = currentFarm.isPending || currentFarm.badge === 'PENDING';
 
   return (
     <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900 py-8 px-4 md:px-10">
@@ -123,6 +99,23 @@ export default function FarmerDashboard() {
             </div>
           )}
         </div>
+
+        {farms.length === 0 && (
+          <div className="bg-white border border-emerald-200 rounded-2xl p-8 text-center space-y-3 shadow-sm">
+            <MapPin className="w-10 h-10 text-emerald-700 mx-auto" />
+            <h2 className="text-lg font-extrabold text-slate-900 font-manrope">No farms enrolled yet</h2>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Verify your land ownership, draw your parcel boundary, and run the satellite scan to mint your first carbon credits.
+            </p>
+            <button
+              onClick={() => navigate('/farmer/land-verification')}
+              className="px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white font-bold text-xs rounded-xl transition-all shadow-sm inline-flex items-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Enroll Your First Parcel</span>
+            </button>
+          </div>
+        )}
 
         {/* Highlighted Revenue Card */}
         {isPending ? (
@@ -213,7 +206,7 @@ export default function FarmerDashboard() {
 
           <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-600 shadow-sm rounded-2xl p-6 space-y-1">
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Soil Biodiversity Index</p>
-            <p className="text-3xl font-extrabold text-amber-700 font-manrope">8.4 / 10</p>
+            <p className="text-3xl font-extrabold text-amber-700 font-manrope">{currentFarm.bioScore ? `${currentFarm.bioScore} / 10` : '—'}</p>
             <p className="text-xs text-slate-500 font-medium pt-1">Ecosystem Richness Score</p>
           </div>
         </div>

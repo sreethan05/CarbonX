@@ -87,29 +87,29 @@ export default function App() {
               <Route path="/submission-success" element={<SuccessScreen />} />
 
               {/* Farmer Dashboard & Analytics & Wallet */}
-              <Route path="/farmer/dashboard" element={<FarmerDashboard />} />
-              <Route path="/dashboard" element={<DashboardRouter />} />
-              <Route path="/farmer/passport/:farmId" element={<DetailedFarmAnalytics />} />
-              <Route path="/farm-analytics" element={<DetailedFarmAnalytics />} />
-              <Route path="/farmer/wallet" element={<CarbonWallet />} />
-              <Route path="/wallet" element={<CarbonWallet />} />
+              <Route path="/farmer/dashboard" element={<ProtectedRoute><FarmerDashboard /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+              <Route path="/farmer/passport/:farmId" element={<ProtectedRoute><DetailedFarmAnalytics /></ProtectedRoute>} />
+              <Route path="/farm-analytics" element={<ProtectedRoute><DetailedFarmAnalytics /></ProtectedRoute>} />
+              <Route path="/farmer/wallet" element={<ProtectedRoute><CarbonWallet /></ProtectedRoute>} />
+              <Route path="/wallet" element={<ProtectedRoute><CarbonWallet /></ProtectedRoute>} />
 
               {/* FPO Command Center & Pooling */}
-              <Route path="/fpo/dashboard" element={<FPODashboard />} />
-              <Route path="/fpo/credit-pooling" element={<FPODashboard />} />
+              <Route path="/fpo/dashboard" element={<ProtectedRoute roles={['fpo', 'verifier']}><FPODashboard /></ProtectedRoute>} />
+              <Route path="/fpo/credit-pooling" element={<ProtectedRoute roles={['fpo', 'verifier']}><FPODashboard /></ProtectedRoute>} />
 
               {/* Admin Oversight */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
 
               {/* Corporate Buyer Portal & Marketplace */}
               <Route path="/corporate/welcome" element={<CorporateWelcome />} />
               <Route path="/corporate-welcome" element={<CorporateWelcome />} />
-              <Route path="/corporate/dashboard" element={<CorporateDashboard />} />
+              <Route path="/corporate/dashboard" element={<ProtectedRoute><CorporateDashboard /></ProtectedRoute>} />
               <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="/create-listing" element={<CreateListing />} />
-              <Route path="/marketplace/checkout" element={<CorporateCreditAnalysis />} />
-              <Route path="/credit-analysis/:id" element={<CorporateCreditAnalysis />} />
-              <Route path="/buyer/certificates/:certId" element={<CertificateRetirementPage />} />
+              <Route path="/create-listing" element={<ProtectedRoute><CreateListing /></ProtectedRoute>} />
+              <Route path="/marketplace/checkout" element={<ProtectedRoute><CorporateCreditAnalysis /></ProtectedRoute>} />
+              <Route path="/credit-analysis/:id" element={<ProtectedRoute><CorporateCreditAnalysis /></ProtectedRoute>} />
+              <Route path="/buyer/certificates/:certId" element={<ProtectedRoute><CertificateRetirementPage /></ProtectedRoute>} />
 
               {/* Support */}
               <Route path="/support" element={<SupportCenter />} />

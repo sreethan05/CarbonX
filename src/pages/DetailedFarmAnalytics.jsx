@@ -1,23 +1,57 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Sparkles, TrendingUp, Compass, ArrowLeft, Leaf, Sliders, CheckCircle2 } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
+import { getFarmPassport, getNdviHistory } from '../services/api';
 
 export default function DetailedFarmAnalytics() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { farmId: routeFarmId } = useParams();
+  const { user, farms } = useAuth();
 
-  // Multi-season Kharif vs Rabi historical NDVI dataset
-  const trendData = [
-    { month: 'Jun (Kharif)', ndvi: 0.42, rabi_baseline: 0.40 },
-    { month: 'Aug (Kharif)', ndvi: 0.76, rabi_baseline: 0.60 },
-    { month: 'Oct (Kharif)', ndvi: 0.82, rabi_baseline: 0.70 },
-    { month: 'Dec (Rabi)', ndvi: 0.58, rabi_baseline: 0.55 },
-    { month: 'Feb (Rabi)', ndvi: 0.74, rabi_baseline: 0.72 },
-    { month: 'Apr (Fallow)', ndvi: 0.38, rabi_baseline: 0.35 }
-  ];
+  const [passport, setPassport] = useState(null);
+  const [trendData, setTrendData] = useState([]);
+  const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Resolve which farm we're looking at: route param first, else the first real farm
+  const farmId = routeFarmId || (farms && farms[0] && farms[0].id) || null;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError('');
+      if (!farmId) {
+        setLoadError('No farm enrolled yet. Complete the parcel enrollment flow first.');
+        setLoading(false);
+        return;
+      }
+      try {
+        const [pp, hist] = await Promise.all([getFarmPassport(farmId), getNdviHistory(farmId)]);
+        if (cancelled) return;
+        if (pp && pp.success) {
+          setPassport(pp);
+        } else {
+          setLoadError((pp && pp.message) || 'Could not load the carbon passport');
+        }
+        if (hist && hist.success && Array.isArray(hist.history) && hist.history.length) {
+          setTrendData(hist.history.map((h) => ({
+            month: `${h.month} (${h.season.split(' ')[0]})`,
+            ndvi: h.ndvi,
+            rabi_baseline: Math.max(0.2, h.ndvi - 0.12),
+          })));
+        }
+      } catch (e) {
+        if (!cancelled) setLoadError('Analytics service unreachable. Is the backend running?');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [farmId]);
 
   // P3 Score Simulator Practice Options
   const practiceOptions = [
@@ -67,9 +101,11 @@ export default function DetailedFarmAnalytics() {
 
   const activePractice = practiceOptions.find((p) => p.id === selectedPracticeId) || practiceOptions[0];
 
-  const baseScore = 78;
-  const baseCredits = 12.5;
-  const baseEarnings = 4250;
+  const baseScore = passport ? Math.round((passport.biodiversity_index || 0) * 10) : 0;
+  const baseCredits = passport ? parseFloat(passport.annual_credits || 0) : 0;
+  const baseEarnings = passport
+    ? Math.round(parseFloat(passport.annual_credits || 0) * parseFloat(passport.benchmark_price || 340))
+    : 0;
 
   const currentScore = baseScore + activePractice.scoreDelta;
   const currentCredits = Math.round((baseCredits + activePractice.creditDelta) * 10) / 10;
@@ -86,10 +122,18 @@ export default function DetailedFarmAnalytics() {
               <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-surface-sage border border-forest-200 px-2.5 py-0.5 rounded-full">
                 Sentinel-2 MRV & Carbon Passport
               </span>
-              <VerificationBadge badge="REGISTRY" showTier size="sm" />
+              <VerificationBadge badge={passport?.badge || 'DOCUMENT'} showTier size="sm" />
             </div>
             <h1 className="text-2xl font-extrabold text-carbon-900 font-manrope">Multi-Season Analytics & Passport</h1>
-            <p className="text-xs text-agriText-muted mt-0.5">Historical vegetative canopy index & predictive agronomic scoring.</p>
+            <p className="text-xs text-agriText-muted mt-0.5">
+              {passport ? `${passport.farm_name || 'Farm'} · ${passport.acreage ?? '—'} ha · Passport ${passport.passport_id}` : 'Historical vegetative canopy index & predictive agronomic scoring.'}
+            </p>
+            {loading && <p className="text-[11px] text-emerald-800 font-bold mt-1">Loading farm record…</p>}
+            {loadError && (
+              <p className="text-[11px] text-rose-700 font-bold bg-rose-50 border border-rose-200 rounded-lg px-2 py-1 mt-1 inline-block">
+                {loadError}
+              </p>
+            )}
           </div>
 
           <button

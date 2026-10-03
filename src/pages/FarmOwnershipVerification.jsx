@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
+import { parsePahaniDocument } from '../services/api';
 
 export default function FarmOwnershipVerification() {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ export default function FarmOwnershipVerification() {
   const [isProcessingPipeline, setIsProcessingPipeline] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [pipelineDone, setPipelineDone] = useState(false);
+  const [parseResult, setParseResult] = useState(null);
+  const [parseError, setParseError] = useState('');
 
   const trustChecklist = [
     { title: '1. OCR Text Extraction', desc: 'Survey Number, Owner Name, Registered Area' },
@@ -120,27 +123,44 @@ export default function FarmOwnershipVerification() {
 
   const handlePahaniUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setPahaniFile(file);
-      runPipeline();
-    }
+    if (!file) return;
+    setPahaniFile(file);
+    runPipeline(file);
   };
 
-  const runPipeline = () => {
+  const runPipeline = async (file) => {
     setIsProcessingPipeline(true);
     setActiveStep(0);
     setPipelineDone(false);
+    setParseResult(null);
+    setParseError('');
 
+    // Animate the checklist while the real OCR pipeline runs
     let current = 0;
     const interval = setInterval(() => {
-      current++;
-      setActiveStep(current);
-      if (current >= trustChecklist.length) {
-        clearInterval(interval);
-        setIsProcessingPipeline(false);
-        setPipelineDone(true);
-      }
+      current += 1;
+      setActiveStep(Math.min(current, trustChecklist.length - 1));
     }, 500);
+
+    try {
+      const data = await parsePahaniDocument(file);
+      clearInterval(interval);
+      setActiveStep(trustChecklist.length - 1);
+      setIsProcessingPipeline(false);
+      if (data && (data.success || data.extracted_fields)) {
+        setParseResult(data);
+        setPipelineDone(true);
+      } else {
+        setParseError((data && (data.message || data.detail)) || 'Document parsing failed — verify the file and retry.');
+      }
+    } catch (err) {
+      clearInterval(interval);
+      setIsProcessingPipeline(false);
+      const msg = err?.status === 401 || err?.message === 'Not authenticated'
+        ? 'Please sign in first so your document can be verified against your account.'
+        : 'Document service unreachable. You can continue and upload from a stronger network.';
+      setParseError(msg);
+    }
   };
 
   const proceedToMapping = () => {
@@ -270,9 +290,32 @@ export default function FarmOwnershipVerification() {
 
                   <p className="text-[11px] text-emerald-800 font-medium">
                     {pipelineDone
-                      ? 'OCR extraction, EXIF metadata, SHA-256 hash & Sentinel-2 vegetation check verified successfully.'
+                      ? 'Document processed by the OCR pipeline. Extracted fields are shown below.'
                       : trustChecklist[Math.min(activeStep, trustChecklist.length - 1)].title}
                   </p>
+
+                  {parseError && (
+                    <p className="text-[11px] text-rose-700 font-bold bg-rose-50 border border-rose-200 rounded-lg p-2">
+                      {parseError}
+                    </p>
+                  )}
+
+                  {parseResult && (
+                    <div className="bg-white border border-emerald-100 rounded-lg p-3 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Extracted Document Fields</p>
+                      {Object.entries(parseResult.extracted_fields || {}).filter(([, v]) => v).slice(0, 8).map(([k, v]) => (
+                        <div key={k} className="flex justify-between text-[11px]">
+                          <span className="text-slate-500 font-semibold capitalize">{k.replace(/_/g, ' ')}:</span>
+                          <span className="font-mono font-bold text-slate-900">{String(v)}</span>
+                        </div>
+                      ))}
+                      {Array.isArray(parseResult.missing_fields) && parseResult.missing_fields.length > 0 && (
+                        <p className="text-[10px] text-amber-700 font-semibold pt-1">
+                          Not detected: {parseResult.missing_fields.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -1,81 +1,81 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Building2, Phone, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { sendLoginOtp, loginUser } from '../services/api';
 
 export default function FPOLogin() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const telanganaFpos = [
-    'Yaadadri Laxmi Narsimha Farmers Producer Company (Mothkur)',
-    'Prasanna Farmers Producer Company Limited (Mothkur)',
-    'Eruvaka Farmers Producer Company Limited (Wardhannapet)',
-    'Nava Vikas Farmers Producer Company Limited (Jangaon)',
-    'Enabavi Producers Cooperative (Jangaon)'
-  ];
-
-  const [selectedFpo, setSelectedFpo] = useState(telanganaFpos[0]);
-  const [phone, setPhone] = useState('9876543210');
+  const [phone, setPhone] = useState('');
   const [showOtp, setShowOtp] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const inputRefs = useRef([]);
-
   useEffect(() => {
     let timer;
     if (showOtp && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
+      timer = setInterval(() => setCountdown((prev) => prev - 1), 1000);
     } else if (countdown === 0) {
       setCanResend(true);
     }
     return () => clearInterval(timer);
   }, [showOtp, countdown]);
 
-  const handleSendOtpSubmit = (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (phone.length < 10) {
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    if (cleanPhone.length !== 10 || !/^\d+$/.test(cleanPhone)) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
     setError('');
-    setShowOtp(true);
-    setCountdown(60);
-    setCanResend(false);
-  };
-
-  const handleDigitChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return;
-    const newDigits = [...otpDigits];
-    newDigits[index] = value.slice(-1);
-    setOtpDigits(newDigits);
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+    setIsVerifying(true);
+    try {
+      const res = await sendLoginOtp(cleanPhone);
+      if (res.success) {
+        setShowOtp(true);
+        setCountdown(60);
+        setCanResend(false);
+        if (res.dev_otp) setOtpDigits(res.dev_otp.split(''));
+      } else {
+        setError(res.message || 'Failed to send OTP. Please retry.');
+      }
+    } catch {
+      if (import.meta.env.DEV) {
+        setShowOtp(true);
+        setCountdown(60);
+        setCanResend(false);
+      } else {
+        setError('Could not reach the server. Please check your connection and retry.');
+      }
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (!canResend) return;
     setCountdown(60);
     setCanResend(false);
-    setOtpDigits(['1', '2', '3', '4', '5', '6']);
     setError('');
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    try {
+      const res = await sendLoginOtp(cleanPhone);
+      if (res.dev_otp) setOtpDigits(res.dev_otp.split(''));
+      if (!res.success) setError(res.message || 'Could not resend OTP. Please retry.');
+    } catch {
+      setError('Could not resend OTP. Please retry.');
+    }
   };
 
-  const handleVerifyOtpSubmit = (e) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
     const fullOtp = otpDigits.join('');
     if (fullOtp.length !== 6) {
       setError('Please enter complete 6-digit OTP');
@@ -83,19 +83,27 @@ export default function FPOLogin() {
     }
 
     setIsVerifying(true);
-    setTimeout(() => {
+    setError('');
+    try {
+      const res = await loginUser(cleanPhone, fullOtp);
+      if (res.success && res.token) {
+        const user = res.user || {};
+        if (String(user.role || '').toLowerCase() !== 'fpo') {
+          setError('This phone number is not registered as an FPO officer.');
+          setIsVerifying(false);
+          return;
+        }
+        await login(res.token, user);
+        navigate('/fpo/dashboard');
+        return;
+      }
+      setError(res.message || 'Invalid OTP. Please try again.');
       setIsVerifying(false);
-      const fpoUserData = {
-        name: 'FPO Officer',
-        fpo_name: selectedFpo,
-        phone: phone,
-        district: selectedFpo.includes('Mothkur') ? 'Yadadri Bhuvanagiri' : selectedFpo.includes('Wardhannapet') ? 'Warangal' : 'Jangaon',
-        role: 'fpo'
-      };
-
-      login('cx_fpo_token_' + Date.now(), fpoUserData);
-      navigate('/fpo/dashboard');
-    }, 500);
+    } catch (err) {
+      console.warn('FPO login unavailable', err);
+      setError('Could not reach the server. Please check your connection and retry.');
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -127,20 +135,7 @@ export default function FPOLogin() {
           )}
 
           {!showOtp ? (
-            <form onSubmit={handleSendOtpSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Registered Telangana FPO / Cooperative</label>
-                <select
-                  value={selectedFpo}
-                  onChange={(e) => setSelectedFpo(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F8FAF8] border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-emerald-600 cursor-pointer"
-                >
-                  {telanganaFpos.map((fpo, idx) => (
-                    <option key={idx} value={fpo}>{fpo}</option>
-                  ))}
-                </select>
-              </div>
-
+            <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Officer Mobile Number (+91)</label>
                 <div className="flex bg-[#F8FAF8] border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-emerald-600/30">
@@ -151,24 +146,28 @@ export default function FPOLogin() {
                     type="text"
                     required
                     maxLength={10}
-                    placeholder="9876543210"
+                    placeholder="10-digit registered mobile"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-3 py-2.5 bg-transparent text-xs font-bold text-slate-900 focus:outline-none"
                   />
                 </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Only mobile numbers registered as FPO officers can access this desk.
+                </p>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                disabled={isVerifying}
+                className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
               >
+                {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 <span>Send Officer 6-Digit OTP</span>
-                <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1.5 text-center">
                   Enter 6-Digit Officer Verification Code
@@ -177,12 +176,16 @@ export default function FPOLogin() {
                   {otpDigits.map((digit, idx) => (
                     <input
                       key={idx}
-                      ref={(el) => (inputRefs.current[idx] = el)}
                       type="text"
                       maxLength={1}
                       value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(idx, e)}
+                      onChange={(e) => {
+                        const v = (e.target.value || '').replace(/\D/g, '').slice(-1);
+                        const next = [...otpDigits];
+                        next[idx] = v;
+                        setOtpDigits(next);
+                        if (v && idx < 5) e.target.parentElement.children[idx + 1]?.focus();
+                      }}
                       className="w-10 h-12 text-center text-lg font-mono font-bold bg-[#F8FAF8] border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/40"
                     />
                   ))}
@@ -219,15 +222,16 @@ export default function FPOLogin() {
                 disabled={isVerifying}
                 className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
+                {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 <span>{isVerifying ? 'Authenticating FPO Officer...' : 'Verify & Access FPO Desk'}</span>
-                <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
 
           <div className="text-center pt-2 border-t border-slate-100">
-            <p className="text-xs text-slate-500">
-              Selected FPO: <strong className="text-slate-800 truncate block">{selectedFpo}</strong>
+            <p className="text-xs text-slate-500 flex items-center justify-center gap-1.5">
+              <Phone className="w-3.5 h-3.5" />
+              FPO officer accounts are provisioned by the CarbonX platform admin.
             </p>
           </div>
         </div>

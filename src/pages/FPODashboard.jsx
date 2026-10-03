@@ -1,105 +1,145 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2, Users, FileText, AlertTriangle, CheckCircle2, XCircle, Search,
-  PlusCircle, Download, ExternalLink, Shield, Layers, Filter, Check, X, RefreshCw
+  Building2, Users, FileText, AlertTriangle, CheckCircle2, Search,
+  PlusCircle, ExternalLink, Shield, Check, X, Loader2, RefreshCw
 } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
+import {
+  getFpoFarmers, getFpoPending, getFpoFlagged, getCertificates,
+  fpoOnboardFarmer, fpoConfirmFarm, fpoReviewFarm,
+} from '../services/api';
 
 export default function FPODashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState('farmers');
-
-  // FPO Org Context Switcher
-  const [fpoContext, setFpoContext] = useState('Yaadadri Laxmi Narsimha FPC Ltd');
 
   // Search & Filter for Tab 1
   const [searchTerm, setSearchTerm] = useState('');
   const [badgeFilter, setBadgeFilter] = useState('ALL');
 
+  // Real data
+  const [farmersList, setFarmersList] = useState([]);
+  const [pendingQueue, setPendingQueue] = useState([]);
+  const [flaggedList, setFlaggedList] = useState([]);
+  const [certificates, setCertificates] = useState([]);
+  const [stats, setStats] = useState({ totalFarmers: 0, totalAcreageHa: 0, pooledCredits: 0 });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
   // Tab 2: Onboarding Form State
   const [onboardData, setOnboardData] = useState({
-    name: '',
-    phone: '',
-    survey_number: '',
-    acreage: '',
-    mandal: 'Pochampally',
-    village: 'Pochampally'
+    name: '', phone: '', survey_number: '', acreage: '', mandal: 'Pochampally', village: 'Pochampally',
   });
   const [onboardSuccess, setOnboardSuccess] = useState(false);
+  const [onboardError, setOnboardError] = useState('');
+  const [isOnboarding, setIsOnboarding] = useState(false);
 
   // Tab 4: Flagged Audit State
   const [auditNotes, setAuditNotes] = useState('');
   const [auditActionDone, setAuditActionDone] = useState(null);
+  const [auditBusyId, setAuditBusyId] = useState(null);
 
-  // Mock initial member dataset
-  const [farmersList, setFarmersList] = useState([
-    { id: 'F-001', name: 'K. Ramesh', phone: '9876543210', survey: '124/A', acres: 2.50, badge: 'REGISTRY', credits: 12.5, status: 'VERIFIED' },
-    { id: 'F-002', name: 'B. Lakshmi', phone: '9876543211', survey: '88/B', acres: 1.80, badge: 'REGISTRY_DOC', credits: 9.0, status: 'VERIFIED' },
-    { id: 'F-003', name: 'M. Narsimha', phone: '9876543212', survey: '45/1', acres: 3.10, badge: 'DOCUMENT', credits: 15.5, status: 'VERIFIED' },
-    { id: 'F-004', name: 'Padma Bai', phone: '9876543213', survey: '124/B', acres: 2.20, badge: 'PENDING', credits: 0.0, status: 'FLAGGED' },
-    { id: 'F-005', name: 'S. Yadaiah', phone: '9876543214', survey: '201/C', acres: 4.00, badge: 'FPO', credits: 20.0, status: 'VERIFIED' }
-  ]);
-
-  // Tab 3: Pending Queue
-  const [pendingQueue, setPendingQueue] = useState([
-    { id: 'P-101', name: 'G. Mallesh', phone: '9876543215', village: 'Pochampally', survey: '90/A', acres: 1.5, date: '2026-09-08' },
-    { id: 'P-102', name: 'T. Swapna', phone: '9876543216', village: 'Mothkur', survey: '33/C', acres: 2.8, date: '2026-09-09' }
-  ]);
-
-  const handleOnboardSubmit = (e) => {
-    e.preventDefault();
-    if (!onboardData.name || !onboardData.phone || !onboardData.survey_number) return;
-
-    const newFarmer = {
-      id: `F-00${farmersList.length + 1}`,
-      name: onboardData.name,
-      phone: onboardData.phone,
-      survey: onboardData.survey_number,
-      acres: parseFloat(onboardData.acreage) || 2.0,
-      badge: 'FPO',
-      credits: (parseFloat(onboardData.acreage) || 2.0) * 5.0,
-      status: 'VERIFIED'
-    };
-
-    setFarmersList([newFarmer, ...farmersList]);
-    setOnboardSuccess(true);
-    setOnboardData({ name: '', phone: '', survey_number: '', acreage: '', mandal: 'Pochampally', village: 'Pochampally' });
-    setTimeout(() => setOnboardSuccess(false), 4000);
-  };
-
-  const handleApprovePending = (id) => {
-    const item = pendingQueue.find(p => p.id === id);
-    if (item) {
-      setFarmersList([
-        { id: `F-${Date.now()}`, name: item.name, phone: item.phone, survey: item.survey, acres: item.acres, badge: 'FPO', credits: item.acres * 5.0, status: 'VERIFIED' },
-        ...farmersList
+  const loadAll = async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [farmersRes, pendingRes, flaggedRes, certsRes] = await Promise.all([
+        getFpoFarmers(), getFpoPending(), getFpoFlagged(), getCertificates(),
       ]);
-      setPendingQueue(pendingQueue.filter(p => p.id !== id));
+      setFarmersList((farmersRes && farmersRes.farmers) || []);
+      setStats({
+        totalFarmers: (farmersRes && farmersRes.total_farmers) || 0,
+        totalAcreageHa: (farmersRes && farmersRes.total_acreage) || 0,
+        pooledCredits: (farmersRes && farmersRes.pooled_credits) || 0,
+      });
+      setPendingQueue((pendingRes && pendingRes.pending) || []);
+      setFlaggedList((flaggedRes && flaggedRes.flagged) || []);
+      setCertificates((certsRes && certsRes.success && certsRes.certificates) || []);
+    } catch (e) {
+      setLoadError('FPO services unreachable. Is the backend running?');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRejectPending = (id) => {
-    setPendingQueue(pendingQueue.filter(p => p.id !== id));
+  useEffect(() => { loadAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleOnboardSubmit = async (e) => {
+    e.preventDefault();
+    if (!onboardData.name || !onboardData.phone || !onboardData.survey_number) return;
+    setIsOnboarding(true);
+    setOnboardError('');
+    try {
+      const res = await fpoOnboardFarmer({
+        name: onboardData.name,
+        phone: onboardData.phone,
+        survey_number: onboardData.survey_number,
+        acreage: parseFloat(onboardData.acreage) || 2.0,
+        mandal: onboardData.mandal,
+        village: onboardData.village,
+      });
+      if (res && res.success) {
+        setOnboardSuccess(true);
+        setOnboardData({ name: '', phone: '', survey_number: '', acreage: '', mandal: 'Pochampally', village: 'Pochampally' });
+        await loadAll();
+        setTimeout(() => setOnboardSuccess(false), 4000);
+      } else {
+        setOnboardError((res && res.message) || 'Onboarding failed');
+      }
+    } catch (err) {
+      setOnboardError('Onboarding service unreachable. Is the backend running?');
+    } finally {
+      setIsOnboarding(false);
+    }
   };
 
-  const handleAuditApprove = () => {
-    setFarmersList(farmersList.map(f => f.name === 'Padma Bai' ? { ...f, badge: 'FPO', status: 'VERIFIED', credits: 11.0 } : f));
-    setAuditActionDone('APPROVED_FPO');
+  const handleApprovePending = async (farmId) => {
+    setAuditBusyId(farmId);
+    try {
+      const res = await fpoConfirmFarm(farmId);
+      if (res && res.success) {
+        await loadAll();
+        refreshUser();
+      } else {
+        alert((res && res.message) || 'Could not confirm farm');
+      }
+    } finally {
+      setAuditBusyId(null);
+    }
   };
 
-  const handleAuditReject = () => {
-    setFarmersList(farmersList.map(f => f.name === 'Padma Bai' ? { ...f, badge: 'PENDING', status: 'BLOCKED' } : f));
-    setAuditActionDone('REJECTED');
+  const handleReviewFlagged = async (farmId, action) => {
+    setAuditBusyId(farmId);
+    try {
+      const res = await fpoReviewFarm(farmId, { action, notes: auditNotes });
+      if (res && (res.success || res.ok)) {
+        setAuditActionDone(action === 'approve' ? 'APPROVED_FPO' : 'REJECTED');
+        setAuditNotes('');
+        await loadAll();
+      } else {
+        alert((res && (res.message || res.detail)) || 'Review action failed');
+      }
+    } catch (err) {
+      alert('Review service unreachable. Are you signed in as an FPO officer?');
+    } finally {
+      setAuditBusyId(null);
+    }
   };
 
   const filteredFarmers = farmersList.filter(f => {
-    const matchesSearch = f.name.toLowerCase().includes(searchTerm.toLowerCase()) || f.survey.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !term
+      || (f.name || '').toLowerCase().includes(term)
+      || (f.phone || '').includes(term)
+      || String(f.surveyNumber || '').toLowerCase().includes(term);
     const matchesBadge = badgeFilter === 'ALL' || f.badge === badgeFilter;
     return matchesSearch && matchesBadge;
   });
+
+  const flaggedCount = flaggedList.length;
 
   return (
     <div className="min-h-screen bg-surface font-inter py-8 px-4 md:px-10 text-agriText-main">
@@ -116,37 +156,36 @@ export default function FPODashboard() {
                 <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-surface-sage border border-forest-200 px-2.5 py-0.5 rounded-full">
                   FPO Command Desk
                 </span>
-
-                {/* FPO Context Switcher Toggle */}
-                <select
-                  value={fpoContext}
-                  onChange={(e) => setFpoContext(e.target.value)}
-                  className="text-[10px] font-bold text-carbon-800 bg-warm-cream border border-forest-200 rounded px-2 py-0.5 focus:outline-none cursor-pointer"
-                >
-                  <option value="Yaadadri Laxmi Narsimha FPC Ltd">Yaadadri FPC (Pochampally Cluster)</option>
-                  <option value="Telangana Cotton Farmer Coop">Telangana Cotton Coop (Warangal Cluster)</option>
-                </select>
               </div>
-              <h1 className="text-2xl font-extrabold text-carbon-900 font-manrope">{fpoContext}</h1>
-              <p className="text-xs text-agriText-muted mt-0.5">Registration: FPO-TEL-2024-0894 | District: Yadadri Bhuvanagiri</p>
+              <h1 className="text-2xl font-extrabold text-carbon-900 font-manrope">{user?.name || 'FPO Cooperative'}</h1>
+              <p className="text-xs text-agriText-muted mt-0.5">Officer: {user?.phone || '—'} | District: Yadadri Bhuvanagiri</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
             <div className="bg-surface-sage/50 border border-forest-200 border-l-4 border-l-emerald-600 rounded-xl p-3 text-center">
               <p className="text-[10px] font-semibold text-agriText-subtle uppercase">Members</p>
-              <p className="text-xl font-bold text-carbon-900 mt-0.5">{farmersList.length}</p>
+              <p className="text-xl font-bold text-carbon-900 mt-0.5">{stats.totalFarmers}</p>
             </div>
             <div className="bg-surface-sage/50 border border-forest-200 border-l-4 border-l-emerald-600 rounded-xl p-3 text-center">
               <p className="text-[10px] font-semibold text-agriText-subtle uppercase">Total Acreage</p>
-              <p className="text-xl font-bold text-carbon-900 mt-0.5">342.5 Acres</p>
+              <p className="text-xl font-bold text-carbon-900 mt-0.5">{stats.totalAcreageHa} ha</p>
             </div>
             <div className="bg-surface-sage/50 border border-forest-200 border-l-4 border-l-emerald-600 rounded-xl p-3 text-center">
               <p className="text-[10px] font-semibold text-agriText-subtle uppercase">Pooled Credits</p>
-              <p className="text-xl font-bold text-primary mt-0.5">1,420 MT</p>
+              <p className="text-xl font-bold text-primary mt-0.5">{stats.pooledCredits} MT</p>
             </div>
           </div>
         </div>
+
+        {loadError && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-4 text-xs font-bold flex items-center justify-between">
+            <span>{loadError}</span>
+            <button onClick={loadAll} className="px-3 py-1.5 bg-rose-700 text-white rounded-lg flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5" /> Retry
+            </button>
+          </div>
+        )}
 
         {/* 5 Tab Navigation Ribbon */}
         <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-2 flex flex-wrap gap-2">
@@ -154,8 +193,8 @@ export default function FPODashboard() {
             { id: 'farmers', label: 'My Farmers', icon: Users, count: farmersList.length },
             { id: 'onboard', label: 'Bulk Member Onboarding', icon: PlusCircle },
             { id: 'pending', label: 'Pending Queue', icon: FileText, count: pendingQueue.length },
-            { id: 'audit', label: 'Flagged Reviews (Padma Bai)', icon: AlertTriangle, count: 1, highlight: true },
-            { id: 'certificates', label: 'FPO Certificates', icon: Shield }
+            { id: 'audit', label: `Flagged Reviews (${flaggedCount})`, icon: AlertTriangle, count: flaggedCount, highlight: flaggedCount > 0 },
+            { id: 'certificates', label: 'FPO Certificates', icon: Shield, count: certificates.length }
           ].map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -183,6 +222,12 @@ export default function FPODashboard() {
           })}
         </div>
 
+        {loading && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 px-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading live FPO data…
+          </div>
+        )}
+
         {/* TAB 1: MY FARMERS */}
         {activeTab === 'farmers' && (
           <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-6">
@@ -197,7 +242,7 @@ export default function FPODashboard() {
                   <Search className="w-4 h-4 text-agriText-subtle absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    placeholder="Search name or survey..."
+                    placeholder="Search name or phone..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-surface-sage/40 border border-forest-200 rounded-xl text-xs text-carbon-900 focus:outline-none"
@@ -215,6 +260,7 @@ export default function FPODashboard() {
                   <option value="DOCUMENT">DOCUMENT</option>
                   <option value="FPO">FPO</option>
                   <option value="PENDING">PENDING</option>
+                  <option value="NONE">NONE</option>
                 </select>
               </div>
             </div>
@@ -223,74 +269,47 @@ export default function FPODashboard() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-forest-100 bg-[#F8FAF8] text-agriText-muted font-semibold uppercase tracking-wider">
-                    <th className="py-3 px-4">Farmer ID</th>
-                    <th className="py-3 px-4">Legal Name</th>
+                    <th className="py-3 px-4">Farmer</th>
                     <th className="py-3 px-4">Phone (+91)</th>
-                    <th className="py-3 px-4">Survey Number</th>
-                    <th className="py-3 px-4">Parcel Acreage</th>
-                    <th className="py-3 px-4">Verification Badge</th>
-                    <th className="py-3 px-4">Carbon Credits</th>
-                    <th className="py-3 px-4">Action</th>
+                    <th className="py-3 px-4">Village</th>
+                    <th className="py-3 px-4">Farms</th>
+                    <th className="py-3 px-4">Acreage</th>
+                    <th className="py-3 px-4">Badge</th>
+                    <th className="py-3 px-4">Credits</th>
+                    <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-forest-50">
-                  {filteredFarmers.map((f) => (
-                    <tr
-                      key={f.id}
-                      onClick={() => navigate('/farmer/dashboard', {
-                        state: {
-                          farmerName: f.name,
-                          surveyNumber: f.survey,
-                          acres: f.acres,
-                          badge: f.badge,
-                          credits: f.credits,
-                          phone: f.phone,
-                          village: 'Pochampally',
-                          district: 'Yadadri Bhuvanagiri'
-                        }
-                      })}
-                      className="even:bg-[#F9FAF9] odd:bg-white hover:bg-emerald-50/60 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-mono text-agriText-muted">{f.id}</td>
-                      <td className="py-3 px-4 font-bold text-carbon-900">{f.name}</td>
-                      <td className="py-3 px-4 font-mono text-agriText-muted">{f.phone}</td>
-                      <td className="py-3 px-4 font-medium text-carbon-800">{f.survey}</td>
-                      <td className="py-3 px-4 font-semibold text-carbon-900">{f.acres} Acres</td>
-                      <td className="py-3 px-4">
-                        <VerificationBadge badge={f.badge} size="sm" />
-                      </td>
-                      <td className="py-3 px-4 font-bold text-primary">{f.credits} MT</td>
-                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => navigate('/farmer/dashboard', {
-                              state: {
-                                farmerName: f.name,
-                                surveyNumber: f.survey,
-                                acres: f.acres,
-                                badge: f.badge,
-                                credits: f.credits,
-                                phone: f.phone,
-                                village: 'Pochampally',
-                                district: 'Yadadri Bhuvanagiri'
-                              }
-                            })}
-                            className="text-xs font-semibold text-[#1B4332] hover:underline flex items-center gap-1"
-                          >
-                            <span>Dashboard</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </button>
-
-                          <button
-                            onClick={() => navigate(`/farmer/passport/${f.id}`)}
-                            className="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline flex items-center gap-1"
-                          >
-                            <span>Passport</span>
-                          </button>
-                        </div>
+                  {filteredFarmers.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-8 px-4 text-center text-agriText-muted">
+                        {loading ? 'Loading…' : 'No members found. Onboard farmers from the onboarding tab.'}
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredFarmers.map((f) => (
+                      <tr key={f.id} className="even:bg-[#F9FAF9] odd:bg-white hover:bg-emerald-50/60 transition-colors">
+                        <td className="py-3 px-4 font-bold text-carbon-900">{f.name}</td>
+                        <td className="py-3 px-4 font-mono text-agriText-muted">{f.phone || '—'}</td>
+                        <td className="py-3 px-4 font-medium text-carbon-800">{f.village || '—'}</td>
+                        <td className="py-3 px-4 font-semibold text-carbon-900">{f.farm_count}</td>
+                        <td className="py-3 px-4 font-semibold text-carbon-900">{f.acres} ha</td>
+                        <td className="py-3 px-4">
+                          <VerificationBadge badge={f.badge || 'NONE'} size="sm" />
+                        </td>
+                        <td className="py-3 px-4 font-bold text-primary">{f.credits} MT</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            f.status === 'FLAGGED' ? 'bg-red-50 text-red-700 border border-red-200' :
+                            f.status === 'VERIFIED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                            'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`}>
+                            {f.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -309,6 +328,12 @@ export default function FPODashboard() {
               <div className="bg-surface-sage border border-forest-200 text-primary p-4 rounded-xl text-xs flex items-center gap-3 font-semibold">
                 <CheckCircle2 className="w-5 h-5 text-primary" />
                 <span>Farmer successfully onboarded under FPO Attestation with FPO Verification Badge.</span>
+              </div>
+            )}
+
+            {onboardError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-xs font-bold">
+                {onboardError}
               </div>
             )}
 
@@ -365,10 +390,11 @@ export default function FPODashboard() {
               <div className="md:col-span-2 pt-2">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+                  disabled={isOnboarding}
+                  className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Onboard Member & Issue FPO Badge</span>
+                  {isOnboarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                  <span>{isOnboarding ? 'Onboarding…' : 'Onboard Member & Issue FPO Badge'}</span>
                 </button>
               </div>
             </form>
@@ -379,15 +405,15 @@ export default function FPODashboard() {
         {activeTab === 'pending' && (
           <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-6">
             <div>
-              <h2 className="text-lg font-bold text-carbon-900">Pending Self-Registration Queue</h2>
-              <p className="text-xs text-agriText-muted">Review self-registered farmers awaiting FPO cooperative confirmation.</p>
+              <h2 className="text-lg font-bold text-carbon-900">Pending Verification Queue</h2>
+              <p className="text-xs text-agriText-muted">Confirm parcels awaiting FPO cooperative verification.</p>
             </div>
 
             {pendingQueue.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-forest-200 rounded-2xl">
                 <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
                 <p className="text-sm font-bold text-carbon-900">Queue Cleared</p>
-                <p className="text-xs text-agriText-muted">No pending self-registrations awaiting review.</p>
+                <p className="text-xs text-agriText-muted">No pending parcels awaiting review.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -395,29 +421,23 @@ export default function FPODashboard() {
                   <div key={p.id} className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono font-bold text-agriText-subtle">{p.id}</span>
+                        <span className="text-xs font-mono font-bold text-agriText-subtle">{(p.id || '').slice(0, 8)}</span>
                         <h3 className="text-sm font-bold text-carbon-900">{p.name}</h3>
                         <VerificationBadge badge="PENDING" size="sm" />
                       </div>
                       <p className="text-xs text-agriText-muted mt-1">
-                        Phone: {p.phone} | Village: {p.village} | Survey: {p.survey} | Area: {p.acres} Acres
+                        Phone: {p.phone || '—'} | Village: {p.village || '—'} | Farm: {p.farm_name || '—'} | Area: {p.acres} ha
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
                       <button
                         onClick={() => handleApprovePending(p.id)}
-                        className="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                        disabled={auditBusyId === p.id}
+                        className="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
                       >
-                        <Check className="w-4 h-4" />
-                        <span>Approve under FPO Badge</span>
-                      </button>
-                      <button
-                        onClick={() => handleRejectPending(p.id)}
-                        className="flex-1 md:flex-none px-4 py-2 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <X className="w-4 h-4" />
-                        <span>Reject</span>
+                        {auditBusyId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        <span>Confirm under FPO Badge</span>
                       </button>
                     </div>
                   </div>
@@ -427,7 +447,7 @@ export default function FPODashboard() {
           </div>
         )}
 
-        {/* TAB 4: FLAGGED REVIEWS (PADMA BAI) */}
+        {/* TAB 4: FLAGGED REVIEWS */}
         {activeTab === 'audit' && (
           <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-6">
             <div className="flex justify-between items-start">
@@ -435,66 +455,115 @@ export default function FPODashboard() {
                 <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   Ground-Truth Audit Inspector
                 </span>
-                <h2 className="text-lg font-bold text-carbon-900 mt-1">Flagged Review : Padma Bai (Survey 124/B)</h2>
-                <p className="text-xs text-agriText-muted">PostGIS Spatial Boundary Discrepancy Review Desk</p>
+                <h2 className="text-lg font-bold text-carbon-900 mt-1">Flagged Farm Reviews</h2>
+                <p className="text-xs text-agriText-muted">Farms blocked by the fraud engine — approve under FPO badge or keep blocked.</p>
               </div>
-
-              <VerificationBadge badge="PENDING" size="lg" />
             </div>
 
-            {auditActionDone ? (
+            {auditActionDone && (
               <div className={`p-4 rounded-xl border text-xs flex items-center gap-3 ${
-                auditActionDone === 'APPROVED_FPO' ? 'bg-surface-sage border border-forest-200 text-primary' : 'bg-red-50 border border-red-200 text-red-900'
+                auditActionDone === 'APPROVED_FPO' ? 'bg-surface-sage border-forest-200 text-primary' : 'bg-red-50 border-red-200 text-red-900'
               }`}>
                 <CheckCircle2 className="w-5 h-5" />
                 <span className="font-semibold">
                   {auditActionDone === 'APPROVED_FPO'
                     ? 'Audit Action: Approved under FPO Attestation Badge (₹300 benchmark rate).'
-                    : 'Audit Action: Farm flagged & blocked from credit earning.'}
+                    : 'Audit Action: Farm kept flagged & blocked from credit earning.'}
                 </span>
               </div>
-            ) : null}
+            )}
 
-            {/* Audit Warning Banner */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900 text-xs flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">PostGIS Spatial Variance Flagged</p>
-                <p className="mt-0.5 text-amber-800">
-                  ST_Intersects boundary collision detected with neighboring survey parcel 124/A (K. Ramesh). Document area: 2.20 Acres vs Polygon area: 2.85 Acres (29.5% area discrepancy exceeds ±20% tolerance).
-                </p>
+            {flaggedList.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-forest-200 rounded-2xl">
+                <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
+                <p className="text-sm font-bold text-carbon-900">No flagged farms</p>
+                <p className="text-xs text-agriText-muted">The fraud engine has not flagged any parcels.</p>
               </div>
+            ) : (
+              <div className="space-y-4">
+                {flaggedList.map(fl => (
+                  <div key={fl.id} className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 space-y-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-sm font-bold text-carbon-900">{fl.farmer_name}</h3>
+                          <span className="text-xs font-mono text-agriText-subtle">{fl.farm_name || '—'}</span>
+                        </div>
+                        <p className="text-xs text-agriText-muted mt-1">
+                          Village: {fl.village || '—'} | Area: {fl.claimed_acres} ha | Flagged: {fl.date}
+                        </p>
+                        <p className="text-xs text-amber-800 font-semibold mt-1">{fl.issue}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-forest-200 rounded-xl p-3 space-y-3">
+                      <textarea
+                        rows={2}
+                        placeholder="Enter physical field inspection notes..."
+                        value={auditNotes}
+                        onChange={e => setAuditNotes(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-forest-200 rounded-xl text-xs text-carbon-900 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleReviewFlagged(fl.id, 'approve')}
+                          disabled={auditBusyId === fl.id}
+                          className="px-5 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
+                        >
+                          {auditBusyId === fl.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                          <span>Approve under FPO Badge (₹300)</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleReviewFlagged(fl.id, 'reject')}
+                          disabled={auditBusyId === fl.id}
+                          className="px-5 py-2.5 bg-red-700 hover:bg-red-800 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
+                        >
+                          <X className="w-4 h-4" />
+                          <span>Reject & Keep Blocked</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: FPO CERTIFICATES */}
+        {activeTab === 'certificates' && (
+          <div className="bg-white border border-forest-100 shadow-card rounded-2xl p-6 space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-carbon-900">Pool Procurement Certificates</h2>
+              <p className="text-xs text-agriText-muted">Certificates generated from member credit sales on the marketplace.</p>
             </div>
 
-            {/* Audit Notes & Control Panel */}
-            <div className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-bold text-carbon-900">FPO Ground-Truth Field Audit Notes</h3>
-              <textarea
-                rows={2}
-                placeholder="Enter physical field inspection notes..."
-                value={auditNotes}
-                onChange={e => setAuditNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-forest-200 rounded-xl text-xs text-carbon-900 focus:outline-none"
-              />
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleAuditApprove}
-                  className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Approve under FPO Badge (₹300)</span>
-                </button>
-
-                <button
-                  onClick={handleAuditReject}
-                  className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
-                >
-                  <X className="w-4 h-4" />
-                  <span>Reject & Block</span>
-                </button>
+            {certificates.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-forest-200 rounded-2xl">
+                <Shield className="w-10 h-10 text-primary mx-auto mb-2" />
+                <p className="text-sm font-bold text-carbon-900">No certificates yet</p>
+                <p className="text-xs text-agriText-muted">When corporate buyers purchase member credits, pooled certificates appear here.</p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                {certificates.map(c => (
+                  <div
+                    key={c.id}
+                    onClick={() => navigate(`/buyer/certificates/${c.id}`)}
+                    className="bg-surface-sage/40 border border-forest-200 rounded-xl p-4 flex justify-between items-center hover:border-primary cursor-pointer transition-all"
+                  >
+                    <div>
+                      <p className="text-xs font-mono font-bold text-carbon-900">{c.id}</p>
+                      <p className="text-[11px] text-agriText-muted mt-0.5">
+                        {c.volume_mt} MT CO2e · {c.crop || 'Mixed Crop'} · {c.farmer_name || 'Pool'} · {c.status === 'RETIRED' ? 'Retired' : 'Held in Escrow'}
+                      </p>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-primary" />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -47,7 +47,7 @@ Columns: `id`, `phone` (unique), `name`, `role`, `fpo_id` (FK → `fpos.id`), `u
 Indexes: `profiles_pkey`, `profiles_phone_key`, `profiles_fpo_id_idx`
 
 ### fpos
-Farmer Producer Organizations. PK `id`. Unique: `registration_no`. Stores plaintext-style `password` column.
+Farmer Producer Organizations. PK `id`. Unique: `registration_no`. (No `password` column — see OTP storage notes below.)
 Columns: `id`, `name`, `registration_no` (unique), `password`, `created_at`, `updated_at`
 Indexes: `fpos_pkey`, `fpos_registration_no_key`
 
@@ -68,13 +68,34 @@ Indexes: `marketplace_listings_pkey`, `idx_listings_status`, `marketplace_listin
 
 ### OTP storage
 Phone OTPs are stored in Redis at runtime under `carbonx:otp:<phone>` with a
-180-second TTL. The legacy `otp_codes` Supabase table remains in the schema
-for compatibility but is not used by the authentication pipeline.
+10-minute TTL and a 5-attempt limit; if Redis is unreachable an in-process
+memory fallback is used. The legacy `otp_codes` Supabase table remains in the
+schema for compatibility but is not used by the authentication pipeline.
+
+`backend/.env` (gitignored) supports `CARBONX_ALLOW_DEV_OTP=1`: when the SMS
+provider is configured but delivery fails (trial/blocked gateway), the real
+stored OTP is returned in the send-otp response so local flows stay testable.
+Never set this in production.
 
 ### corporates
 Corporate buyers. PK `c_id` (auto int).
-Columns: `c_id`, `name`, `password_hash`, `created_at`, `updated_at`
+Columns: `c_id`, `name`, `password_hash` (bcrypt), `created_at`, `updated_at`
 Index: `corporates_pkey`
+Seeded demo account: "Telangana Sustainable Agro Pvt Ltd" / "Corporate@2026"
+(via `POST /corporate/login`).
+
+### Other live tables (verified 2026-10-03 via PostgREST OpenAPI)
+- `land_registry` — 30 rows of Telangana survey parcels (survey_number,
+  owner_name, area_ha, village, mandal, tier, registry_geometry_available).
+- `farms.badge` and `farms.fpo_id` exist.
+- `fpos` has NO `password` column (older docs claimed one): FPO officers log in
+  through the farmer phone-OTP pipeline; a profile with `role='fpo'` unlocks
+  the FPO desk. Demo officer profile: phone `9000000001`.
+- There are NO `orders` or `certificates` tables (and no Supabase CLI token on
+  this machine, so DDL is not possible). Purchases are persisted by updating
+  `marketplace_listings` (status Sold/Retired, `tx_hash` escrow ref,
+  `current_bid`), and certificate ids are derived deterministically from the
+  listing id (`CX-<year>-CERT-<first 8 hex chars>`).
 
 ### Relationship map
 

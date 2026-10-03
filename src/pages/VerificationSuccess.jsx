@@ -1,10 +1,43 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, Download, CheckCircle2, Hash, Layers } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Download, Hash } from 'lucide-react';
 import BadgePill from '../components/BadgePill';
 
 export default function VerificationSuccess() {
   const navigate = useNavigate();
+
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem('carbonx_farm_result') || 'null'); } catch { /* ignore */ }
+  const analysis = data?.analysis || {};
+  const parcel = data?.parcel || {};
+  const savedFarm = data?.savedFarm || null;
+  const badge = parcel.badge || 'REGISTRY';
+
+  const downloadReport = () => {
+    const lines = [
+      'CarbonX — Farmland Verification Audit Report',
+      '=============================================',
+      `Parcel: Survey ${parcel.surveyNumber || '—'} (${parcel.village || '—'})`,
+      `Owner: ${parcel.ownerName || '—'}`,
+      `Farm ID: ${savedFarm?.id || 'not persisted'}`,
+      `Tier: ${parcel.tierCode || '—'} · Badge: ${badge}`,
+      `Area: ${analysis.area_hectares ?? parcel.areaHa ?? '—'} ha`,
+      `NDVI: ${analysis.ndvi ?? '—'} · EVI: ${analysis.evi ?? '—'}`,
+      `Vegetation health: ${analysis.vegetation_health || '—'}`,
+      `Biodiversity score: ${analysis.biodiversity_score ?? '—'}`,
+      `Annual sequestration: ${analysis.carbon_tonnes ?? '—'} MT CO2e`,
+      `Tradeable credits: ${analysis.total_credits ?? '—'}`,
+      `Data source: ${analysis.satellite_source || '—'}`,
+      `Generated: ${new Date().toISOString()}`,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `carbonx_audit_${(parcel.surveyNumber || 'parcel').replace('/', '-')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 font-inter text-slate-900 py-10 px-4 flex items-center justify-center">
@@ -24,22 +57,22 @@ export default function VerificationSuccess() {
               Farmland Verification Complete!
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Your parcel coordinates and satellite biomass scan have been sealed and minted into the ledger.
+              Your parcel coordinates and satellite biomass scan have been sealed into the MRV ledger.
             </p>
           </div>
 
           <div className="py-2">
-            <BadgePill badge="REGISTRY" size="lg" />
+            <BadgePill badge={badge} size="lg" />
           </div>
 
-          {/* Blockchain Transaction Hash Display */}
+          {/* Verification Hash Display */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between font-mono">
             <div className="flex items-center gap-2 text-slate-600">
               <Hash className="w-4 h-4 text-emerald-700" />
-              <span>Immutable Hash:</span>
+              <span>Record ID:</span>
             </div>
             <span className="font-bold text-slate-900 truncate max-w-[200px] sm:max-w-xs">
-              0x7f9a883ce42b91028471abc882
+              {savedFarm?.id || 'PENDING-SYNC'}
             </span>
           </div>
 
@@ -47,26 +80,32 @@ export default function VerificationSuccess() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-left">
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-slate-500 uppercase">Parcel ID</p>
-              <p className="text-xs font-bold text-slate-900 mt-0.5">TEL-124/A</p>
+              <p className="text-xs font-bold text-slate-900 mt-0.5">TEL-{parcel.surveyNumber || '—'}</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase">Acreage</p>
-              <p className="text-xs font-bold text-slate-900 mt-0.5">2.50 Acres</p>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase">Area</p>
+              <p className="text-xs font-bold text-slate-900 mt-0.5">{analysis.area_hectares ?? parcel.areaHa ?? '—'} ha</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-slate-500 uppercase">Baseline NDVI</p>
-              <p className="text-xs font-bold text-emerald-800 mt-0.5">0.78 Index</p>
+              <p className="text-xs font-bold text-emerald-800 mt-0.5">{analysis.ndvi ?? '—'} Index</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-slate-500 uppercase">Annual Credits</p>
-              <p className="text-xs font-bold text-emerald-800 mt-0.5">12.50 MT</p>
+              <p className="text-xs font-bold text-emerald-800 mt-0.5">{analysis.total_credits ?? '—'} MT</p>
             </div>
           </div>
+
+          {!savedFarm && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 font-semibold">
+              Farm record not persisted yet — sign in and rerun the scan to save it to your account.
+            </p>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
-              onClick={() => alert('Downloading PDF Audit Report...')}
+              onClick={downloadReport}
               className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
