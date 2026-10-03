@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MapPin, ShieldCheck, Wallet, ArrowRight, Compass, AlertTriangle } from 'lucide-react';
+import { MapPin, ShieldCheck, Wallet, ArrowRight, Compass, AlertTriangle, PlusCircle, ShoppingCart, TrendingUp } from 'lucide-react';
 import VerificationBadge from '../components/VerificationBadge';
 import { useAuth } from '../context/AuthContext';
 
@@ -215,6 +215,60 @@ export default function FarmerDashboard() {
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Soil Biodiversity Index</p>
             <p className="text-3xl font-extrabold text-amber-700 font-manrope">8.4 / 10</p>
             <p className="text-xs text-slate-500 font-medium pt-1">Ecosystem Richness Score</p>
+          </div>
+        </div>
+
+        {/* Quick Action Navigation Grid */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 font-manrope">Farm Management & Marketplace Actions</h2>
+            <p className="text-xs text-slate-500">Quickly navigate to land registration, passport analytics, or marketplace trading.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <button
+              onClick={() => navigate('/farmer/land-verification')}
+              className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all text-left space-y-2 group"
+            >
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-800 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-900">Enroll New Parcel</p>
+              <p className="text-[11px] text-slate-500">Verify land deeds & registry</p>
+            </button>
+
+            <button
+              onClick={() => navigate('/create-listing')}
+              className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all text-left space-y-2 group"
+            >
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-800 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+                <PlusCircle className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-900">List Credits for Sale</p>
+              <p className="text-[11px] text-slate-500">Publish to corporate buyers</p>
+            </button>
+
+            <button
+              onClick={() => navigate('/farm-analytics')}
+              className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all text-left space-y-2 group"
+            >
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-800 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-900">Carbon Passport</p>
+              <p className="text-[11px] text-slate-500">NDVI biomass & P3 score</p>
+            </button>
+
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all text-left space-y-2 group"
+            >
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-800 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-900">Open Marketplace</p>
+              <p className="text-[11px] text-slate-500">Browse live carbon listings</p>
+            </button>
           </div>
         </div>
 

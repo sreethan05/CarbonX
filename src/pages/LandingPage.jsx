@@ -2,10 +2,20 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Leaf, ArrowRight, ShieldCheck, Cpu, Globe, Users, Building2, Wallet, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { currentLang, changeLanguage } = useLanguage();
+  const { isAuthenticated, role } = useAuth();
+
+  const handleFpoClick = () => {
+    if (isAuthenticated && (role === 'fpo' || role === 'verifier')) {
+      navigate('/fpo/dashboard');
+    } else {
+      navigate('/fpo/login');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAF8] font-inter text-slate-900">
@@ -36,10 +46,10 @@ export default function LandingPage() {
             </div>
 
             <button
-              onClick={() => navigate('/farmer/login')}
+              onClick={() => navigate(isAuthenticated ? '/dashboard' : '/farmer/login')}
               className="text-xs font-semibold text-emerald-100 hover:text-white px-3 py-2 rounded-xl transition-colors hidden sm:block"
             >
-              Sign In
+              {isAuthenticated ? 'My Dashboard' : 'Sign In'}
             </button>
 
             <button
@@ -81,7 +91,7 @@ export default function LandingPage() {
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={() => navigate('/fpo/dashboard')}
+              onClick={handleFpoClick}
               className="px-6 py-3.5 bg-[#2D6A4F] hover:bg-[#40916C] text-white border border-emerald-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
             >
               <span>FPO Command Center</span>

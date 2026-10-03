@@ -19,7 +19,24 @@ export default function CreateListing() {
 
   const handleSubmitListing = (e) => {
     e.preventDefault();
-    alert(`Listing published successfully! Gross INR ${grossValue.toLocaleString()} | Net INR ${netEarnings.toLocaleString()}`);
+    const newListing = {
+      id: `LST-NEW-${Date.now()}`,
+      crop: 'Cotton & Paddy',
+      farmer: user?.name || 'K. Ramesh',
+      location: `${user?.village || 'Pochampally'}, ${user?.district || 'Yadadri Bhuvanagiri'}`,
+      available: volume.toString(),
+      carbonScore: (volume * 0.6).toFixed(2),
+      bioScore: (volume * 0.4).toFixed(2),
+      price: unitPrice.toString(),
+      status: 'Active',
+      badge: assignedBadge,
+    };
+    try {
+      const existing = JSON.parse(localStorage.getItem('carbonx_custom_listings') || '[]');
+      localStorage.setItem('carbonx_custom_listings', JSON.stringify([newListing, ...existing]));
+    } catch (err) {
+      console.warn('Could not save custom listing', err);
+    }
     navigate('/marketplace');
   };
 

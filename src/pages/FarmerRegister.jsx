@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Volume2, Phone, ShieldCheck, ArrowRight, CheckCircle2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { sendOtp, verifyRegistrationOtp, registerUser } from '../services/api';
 
 export default function FarmerRegister() {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ export default function FarmerRegister() {
   const [otpTimer, setOtpTimer] = useState(600); // 10 minutes timer
   const [timerActive, setTimerActive] = useState(false);
   const [otpError, setOtpError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     let interval = null;
@@ -42,20 +44,22 @@ export default function FarmerRegister() {
 
   const handleMicClick = () => {
     setIsListening(true);
-    setSpeechText(currentLang === 'te' ? 'నమస్కారం! మీ పేరు మరియు వివరాలు మాట్లాడండి...' : 'Listening... Speak your legal name and village.');
     setTimeout(() => {
-      setIsListening(false);
       setName('K. Ramesh');
       setPhone('9876543210');
+      setRawIdNumber('200000000009');
+      setMaskedId('XXXXXXXX0009');
+      setDistrict('Yadadri Bhuvanagiri');
       setMandal('Pochampally');
       setVillage('Pochampally');
-      setSpeechText(currentLang === 'te' ? 'వాయిస్ గుర్తింపు పూర్తయింది: K. Ramesh (Pochampally)' : 'Voice input captured: K. Ramesh (Pochampally)');
-    }, 2500);
+      setIsListening(false);
+    }, 2000);
   };
 
-  const handleIdChange = (val) => {
+  const handleIdChange = (e) => {
+    const val = e.target.value;
     setRawIdNumber(val);
-    if (val.length >= 4) {
+    if (val.length === 12) {
       const last4 = val.slice(-4);
       setMaskedId(`XXXX-XXXX-[${last4} Redacted]`);
     } else {
@@ -63,24 +67,92 @@ export default function FarmerRegister() {
     }
   };
 
-  const handleSubmitForm = (e) => {
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
-    if (!name || !phone) return;
-    setShowOtpModal(true);
-    setTimerActive(true);
-    setOtpTimer(600);
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    if (!name || cleanPhone.length < 10) return;
+
+    setOtpError('');
+    setOtp('');
+
+    try {
+      const res = await sendOtp(cleanPhone);
+      setShowOtpModal(true);
+      if (res.success) {
+        setTimerActive(true);
+        setOtpTimer(600);
+      } else {
+        setOtpError(res.message || 'Failed to dispatch SMS to your phone.');
+      }
+    } catch (err) {
+      console.warn('Backend OTP send offline', err);
+      setShowOtpModal(true);
+      setOtpError('Failed to send SMS to your phone. Please check connectivity.');
+    }
   };
 
-  const handleVerifyOtpSubmit = (e) => {
+  const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
-    if (otp.length !== 6 && otp !== '123456') {
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    if (otp.length !== 6) {
       setOtpError('Invalid 6-digit OTP code');
       return;
     }
 
+    setIsRegistering(true);
+    setOtpError('');
+
+    let verificationToken = null;
+    try {
+      const verifyRes = await verifyRegistrationOtp(cleanPhone, otp);
+      if (!verifyRes || !verifyRes.success) {
+        setOtpError((verifyRes && verifyRes.message) || 'Invalid or expired OTP');
+        return;
+      }
+      verificationToken = verifyRes.verification_token;
+    } catch {
+      // Backend unreachable; registration attempt below reports the outcome
+    }
+
+    // Step 2: Register user
+    const regPayload = {
+      phone: cleanPhone,
+      otp,
+      otp_verification_token: verificationToken,
+      name: name || 'K. Ramesh',
+      aadhaar: rawIdNumber,
+      state: 'Telangana',
+      district: district || 'Yadadri Bhuvanagiri',
+      village: village || 'Pochampally',
+      upi: `${cleanPhone}@upi`,
+      role: 'farmer',
+      preferred_language: currentLang || 'en',
+    };
+
+    try {
+      const regRes = await registerUser(regPayload);
+      if (regRes.success && regRes.token) {
+        await login(regRes.token, regRes.user);
+        setShowOtpModal(false);
+        navigate('/farmer/land-verification');
+        return;
+      }
+      setOtpError(regRes.message || 'Registration failed. Please try again.');
+      return;
+    } catch (err) {
+      console.warn('Backend registration unavailable', err);
+      if (!import.meta.env.DEV) {
+        setOtpError('Could not reach the registration service. Please check your connection and retry.');
+        return;
+      }
+    } finally {
+      setIsRegistering(false);
+    }
+
+    // Demo mode fallback (dev builds only): backend unreachable
     const userData = {
-      name,
-      phone,
+      name: name || 'K. Ramesh',
+      phone: cleanPhone,
       district,
       mandal,
       village,
@@ -88,7 +160,7 @@ export default function FarmerRegister() {
       aadhaar_last4: rawIdNumber.slice(-4) || '3210'
     };
 
-    login('cx_token_' + Date.now(), userData);
+    await login('cx_token_' + Date.now(), userData);
     setShowOtpModal(false);
     navigate('/farmer/land-verification');
   };
@@ -237,19 +309,19 @@ export default function FarmerRegister() {
             type="submit"
             className="w-full py-3 bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 mt-4"
           >
-            <span>Generate Twilio OTP Verification</span>
+            <span>Verify Phone & Continue</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Twilio OTP Verification Modal */}
+        {/* OTP Verification Modal */}
         {showOtpModal && (
           <div className="fixed inset-0 z-50 bg-[#1B4332]/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white border border-slate-200 shadow-xl rounded-xl p-6 max-w-md w-full space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Phone className="w-5 h-5 text-emerald-700" />
-                  <h3 className="text-sm font-bold text-slate-900">Twilio OTP Verification</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Phone OTP Verification</h3>
                 </div>
                 <span className="text-xs font-mono font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
                   {formatTimer(otpTimer)}
@@ -261,7 +333,7 @@ export default function FarmerRegister() {
               </p>
 
               {otpError && (
-                <p className="text-xs text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2 rounded">
+                <p className="text-xs text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2.5 rounded-lg leading-relaxed">
                   {otpError}
                 </p>
               )}
@@ -273,22 +345,11 @@ export default function FarmerRegister() {
                     type="text"
                     maxLength={6}
                     required
-                    placeholder="123456"
+                    placeholder="Enter 6-digit OTP"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-center text-lg font-mono font-bold tracking-widest text-slate-900 focus:outline-none focus:border-emerald-600"
                   />
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] text-slate-600 flex justify-between items-center">
-                  <span>Demo Mode Bypass Code: <strong className="font-mono text-emerald-800">123456</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => setOtp('123456')}
-                    className="text-[10px] font-bold bg-emerald-700 text-white px-2 py-0.5 rounded"
-                  >
-                    Autofill
-                  </button>
                 </div>
 
                 <div className="flex gap-2">
