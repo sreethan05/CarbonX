@@ -22,6 +22,37 @@ CarbonX is an agri carbon + biodiversity credits marketplace. Farmers register v
 - CLI is installed (v2.116.0) and logged in on this machine; auth token is managed by the CLI itself (no `~/.supabase/access-token` file).
 - Project is NOT linked locally (`supabase link` not run); always pass the ref explicitly.
 
+### Paused project = DNS record removed (important)
+
+A paused Supabase project **loses its DNS record**. `<ref>.supabase.co` then
+returns NXDOMAIN from Cloudflare's authoritative nameservers, and every
+`supabase_db` call raises `httpx.ConnectError("[Errno -2] Name or service not
+known")` on Linux (`[Errno 11001] getaddrinfo failed` on Windows).
+
+Guard rails in the backend:
+
+- `supabase_db.probe()` — cached (30s) REST probe. `reason` is one of
+  `not_configured` / `dns_unresolved` / `connection_refused` / `timeout` /
+  `server_error` / `project_paused` (HTTP 429). Reported by `GET /health` and
+  `GET /`.
+- `supabase_db.is_configured()` — no network I/O. `is_ready()` includes the
+  probe and is only used for health reporting, never on the request path.
+- `_safe_error()` / `_error_response()` in `backend/app/main.py` replace
+  infrastructure errors with a plain-language message plus
+  `code: "db_unavailable"`. A global `@app.exception_handler(Exception)` is the
+  backstop for endpoints without a local try/except.
+- The frontend maps `code === "db_unavailable"` to the `errDbUnavailable`
+  i18n key (en/hi/te) via `apiErrorMessage()` in `src/services/api.js`.
+- A keepalive task pings Supabase every `SUPABASE_KEEPALIVE_SECONDS`
+  (default 12h) so the free-tier project is never auto-paused.
+
+Verify DNS with a public resolver when in doubt — the local ISP resolver can
+serve a stale NXDOMAIN:
+
+```powershell
+nslookup rbdyzeuucgqkhlikbpnd.supabase.co 1.1.1.1
+```
+
 ### Working CLI commands (no password prompt — use CLI login role)
 
 ```powershell

@@ -96,6 +96,13 @@ export default function CorporateLogin() {
         navigate('/corporate/dashboard');
         return;
       }
+      const data = await response.json().catch(() => ({}));
+      const detail = data?.detail;
+      if (detail?.code === 'db_unavailable') {
+        setError(t('errDbUnavailable'));
+        setIsVerifying(false);
+        return;
+      }
     } catch (err) {
       console.warn('Backend corporate login API offline, using fallback auth', err);
     }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { sendLoginOtp, loginUser } from '../services/api';
+import { sendLoginOtp, loginUser, apiErrorMessage } from '../services/api';
 import DemoNumberBanner, { DEMO_FARMER_PHONE } from '../components/DemoNumberBanner';
 
 export default function FarmerLogin() {
@@ -49,7 +49,7 @@ export default function FarmerLogin() {
     try {
       const res = await sendLoginOtp(phone);
       if (!res.success) {
-        setError(res.message || 'Failed to send OTP. Please try again.');
+        setError(apiErrorMessage(res, t, 'errOtpService'));
         return;
       }
 
@@ -99,7 +99,7 @@ export default function FarmerLogin() {
     try {
       const res = await sendLoginOtp(phone);
       if (!res.success) {
-        setError(res.message || 'Failed to resend OTP. Please try again.');
+        setError(apiErrorMessage(res, t, 'errResendOtp'));
         return;
       }
 

@@ -11,10 +11,13 @@ load_dotenv(BACKEND_DIR / ".env", override=True)
 
 from fastapi import FastAPI, File, Header, HTTPException, Depends, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Literal, Optional
+import asyncio
 import base64
 import re
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 import os
 
@@ -25,7 +28,64 @@ from app import redis_store
 from app import sample_data
 from app.services.kyc_service import analyse_document, validate_aadhaar
 
-app = FastAPI(title="CarbonX API")
+DB_UNAVAILABLE_MESSAGE = (
+    "Our database is temporarily unavailable (it may be paused). Please try again in a few minutes."
+)
+
+# Raw network/OS errors ("[Errno -2] Name or service not known") are meaningless
+# to a farmer on the phone, so they are logged server-side and replaced with an
+# actionable message plus a machine-readable code for the UI to translate.
+_DB_UNREACHABLE_TOKENS = (
+    "name or service not known",
+    "getaddrinfo",
+    "nodename nor servname",
+    "name resolution",
+    "connection refused",
+    "network is unreachable",
+    "all connection attempts failed",
+    "temporary failure",
+    "connection aborted",
+    "connectionerror",
+    "connecterror",
+)
+_TIMEOUT_TOKENS = ("timed out", "timeout", "read timed out")
+
+
+def _keepalive_interval() -> int:
+    raw = os.getenv("SUPABASE_KEEPALIVE_SECONDS", str(12 * 3600)).strip()
+    try:
+        return max(900, int(raw))
+    except ValueError:
+        return 12 * 3600
+
+
+async def _supabase_keepalive() -> None:
+    """Keep the Supabase project active so the free tier never auto-pauses it.
+
+    A paused project loses its DNS record, which is exactly what broke the OTP
+    flow. A cheap read every few hours keeps the project warm.
+    """
+    while True:
+        await asyncio.sleep(_keepalive_interval())
+        try:
+            state = await asyncio.to_thread(db.probe)
+            print(f"[keepalive] supabase reachable={state['reachable']} reason={state['reason']}")
+        except Exception as exc:
+            print(f"[keepalive] supabase probe failed: {exc}")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    task = asyncio.create_task(_supabase_keepalive())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="CarbonX API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -81,12 +141,58 @@ def _otp_dev_fallback_enabled() -> bool:
     return env not in {"prod", "production"}
 
 
+def _safe_error(exc: Exception, fallback: str = "Something went wrong. Please try again.") -> str:
+    """Turn an exception into a message that is safe to show on a phone.
+
+    Infrastructure failures (DNS/connection) are logged with their detail and
+    replaced with an actionable message; everything else keeps its text so
+    validation errors stay specific.
+    """
+    detail = str(exc).strip()
+    lowered = detail.lower()
+    if any(token in lowered for token in _DB_UNREACHABLE_TOKENS):
+        print(f"[DB UNREACHABLE] {type(exc).__name__}: {detail}")
+        return DB_UNAVAILABLE_MESSAGE
+    if any(token in lowered for token in _TIMEOUT_TOKENS):
+        print(f"[TIMEOUT] {type(exc).__name__}: {detail}")
+        return "The service took too long to respond. Please try again."
+    return detail or fallback
+
+
+def _error_response(exc: Exception, fallback: str = "Something went wrong. Please try again.") -> dict:
+    message = _safe_error(exc, fallback)
+    return {
+        "success": False,
+        "code": "db_unavailable" if message == DB_UNAVAILABLE_MESSAGE else "error",
+        "message": message,
+    }
+
+
 def _require_database():
-    if not db.is_ready():
-        raise HTTPException(
-            status_code=503,
-            detail="Database is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env.",
-        )
+    """Fail fast when Supabase is not configured at all.
+
+    Reachability is deliberately NOT checked here: a paused project should not
+    cost every request a probe round-trip. The query itself raises, and the
+    handler below turns that into the same friendly message.
+    """
+    if db.is_configured():
+        return
+    raise HTTPException(
+        status_code=503,
+        detail="Database is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env.",
+    )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(_request, exc: Exception):
+    """Turn any unhandled error into a safe, actionable JSON payload.
+
+    Without this, a paused Supabase surfaced as a raw
+    "[Errno -2] Name or service not known" on the phone screen.
+    """
+    payload = _error_response(exc)
+    status_code = 503 if payload["code"] == "db_unavailable" else 500
+    return JSONResponse(status_code=status_code, content=payload)
 
 
 def _get_user(phone: str):
@@ -533,10 +639,12 @@ def _parse_pahani_upload(content_base64: str, filename: str, content_type: str) 
 
 @app.get("/")
 def root():
+    state = db.probe()
     return {
         "message": "CarbonX API running",
         "version": "5.0",
-        "supabase": db.is_ready(),
+        "supabase": state["reachable"],
+        "supabase_reason": state["reason"],
         "sms": _sms_ready(),
         "earth_engine": earth_engine_ready,
     }
@@ -563,7 +671,7 @@ def send_otp(data: SendOtpModel):
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/register/verify-otp")
@@ -593,7 +701,7 @@ def verify_registration_otp(data: RegistrationOtpVerifyModel):
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/register")
@@ -662,7 +770,7 @@ def register(data: RegisterModel):
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/login/send-otp")
@@ -681,7 +789,7 @@ def login_send_otp(data: SendOtpModel):
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/login")
@@ -700,7 +808,7 @@ def login(data: LoginOtpModel):
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/fpo/login")
@@ -1451,7 +1559,7 @@ def get_me(current_user: dict = Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     farms = _get_user_farms(phone)
-    kyc = db.get_kyc_status(phone) if db.is_ready() else None
+    kyc = db.get_kyc_status(phone) if db.is_configured() else None
     return {"success": True, "user": _user_response(user, phone), "farms": farms, "kyc": kyc}
 
 
@@ -1469,7 +1577,7 @@ def update_profile(data: UpdateProfileModel, current_user: dict = Depends(get_cu
             return {"success": False, "message": "Profile update failed"}
         return {"success": True, "user": _user_response(updated, phone)}
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/analyze")
@@ -1548,7 +1656,7 @@ def analyze(data: AnalyzeModel):
             "satellite_source": satellite_source,
         }
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.post("/save-farm")
@@ -1567,7 +1675,7 @@ def save_farm(data: SaveFarmModel, current_user: dict = Depends(get_current_user
         fpo_path = path == "fpo"
         if fpo_path and farm.get("fpo_id"):
             db.update_profile(phone, {"fpo_id": farm.get("fpo_id")})
-        latest = db.get_kyc_status(phone) if db.is_ready() else None
+        latest = db.get_kyc_status(phone) if db.is_configured() else None
         extracted = (latest or {}).get("extracted_fields") or {}
         if fpo_path or extracted.get("path") == "fpo" and (latest or {}).get("status") == "PENDING":
             status = "PENDING"
@@ -1619,7 +1727,7 @@ def save_farm(data: SaveFarmModel, current_user: dict = Depends(get_current_user
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.get("/marketplace/listings")
@@ -1668,7 +1776,7 @@ def marketplace_listings(
 
         result = None
         source = "live_db"
-        if db.is_ready():
+        if db.is_configured():
             try:
                 result = db.get_listings_filtered(**query_kwargs)
             except Exception as e:
@@ -1693,7 +1801,7 @@ def marketplace_listings(
             "listings": result["listings"],
         }
     except Exception as e:
-        return {"success": False, "message": str(e), "source": "error", "total": 0, "count": 0, "listings": []}
+        return {**_error_response(e), "source": "error", "total": 0, "count": 0, "listings": []}
 
 
 @app.post("/marketplace/listings")
@@ -1750,7 +1858,7 @@ def create_listing(data: CreateListingModel, current_user: dict = Depends(get_cu
     except HTTPException:
         raise
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 @app.api_route("/predict", methods=["GET", "POST"])
@@ -1771,7 +1879,7 @@ def predict(longitude: float, latitude: float):
             "total_credits": credits["total_credits"],
         }
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return _error_response(e)
 
 
 # Additional Endpoints required by SIH 2026 Spec

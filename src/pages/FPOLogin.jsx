@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { loginFpo, sendOtp } from '../services/api';
+import { loginFpo, sendOtp, apiErrorMessage } from '../services/api';
 
 export default function FPOLogin() {
   const navigate = useNavigate();
@@ -58,7 +58,7 @@ export default function FPOLogin() {
       const res = await sendOtp(phone);
 
       if (!res.success) {
-        setError(res.message || t('regErrSendOtp'));
+        setError(apiErrorMessage(res, t, 'regErrSendOtp'));
         return;
       }
 
@@ -90,7 +90,7 @@ export default function FPOLogin() {
       const res = await sendOtp(phone);
 
       if (!res.success) {
-        setError(res.message || t('fpoLoginErrResend'));
+        setError(apiErrorMessage(res, t, 'fpoLoginErrResend'));
         return;
       }
 
@@ -139,7 +139,7 @@ export default function FPOLogin() {
     try {
       const fpoRes = await loginFpo(phone, selectedFpo, fullOtp);
       if (!fpoRes.success) {
-        setError(fpoRes.message || t('fpoLoginErrInvalid'));
+        setError(apiErrorMessage(fpoRes, t, 'fpoLoginErrInvalid'));
         return;
       }
       await login(fpoRes.token, fpoRes.user);

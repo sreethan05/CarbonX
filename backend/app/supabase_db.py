@@ -1,21 +1,94 @@
 import os
+import threading
+import time
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
+
+import httpx
 
 _supabase = None
 _ready = False
 
+# A paused Supabase project drops its DNS record, so every DB-backed request
+# used to die with a raw "[Errno -2] Name or service not known". Probing the
+# REST API lets the app tell "paused/unreachable" apart from "wrong config"
+# and answer with an actionable message instead of an OS errno.
+_PROBE_TTL_SECONDS = 30.0
+_probe_lock = threading.Lock()
+_probe_state: dict = {"checked_at": 0.0, "reachable": False, "reason": None, "host": ""}
 
-def _client():
-    global _supabase, _ready
-    if _supabase is not None:
-        return _supabase
+
+def _config() -> tuple[str, str]:
     url = os.getenv("SUPABASE_URL", "").strip() or os.getenv("VITE_SUPABASE_URL", "").strip()
     key = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         or os.getenv("SUPABASE_ANON_KEY", "").strip()
         or os.getenv("VITE_SUPABASE_ANON_KEY", "").strip()
     )
+    return url, key
+
+
+def _classify(exc: Exception) -> str:
+    text = str(exc).lower()
+    if any(token in text for token in ("name or service not known", "getaddrinfo", "nodename nor servname", "name resolution", "temporary failure")):
+        return "dns_unresolved"
+    if "connection refused" in text:
+        return "connection_refused"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    return "unreachable"
+
+
+def probe(timeout: float = 4.0, attempts: int = 2) -> dict:
+    """Check that the Supabase host resolves and the REST API answers.
+
+    Returns {"reachable", "reason", "host", "checked_at"}. Cached for 30s so
+    hot paths do not pay for a network round-trip on every request, and retried
+    once because some resolvers intermittently return a stale NXDOMAIN.
+    """
+    url, key = _config()
+    host = urlparse(url).hostname or "" if url else ""
+    if not url or not key:
+        return {"reachable": False, "reason": "not_configured", "host": host, "checked_at": time.time()}
+
+    now = time.time()
+    with _probe_lock:
+        if now - _probe_state["checked_at"] < _PROBE_TTL_SECONDS:
+            return dict(_probe_state)
+
+    state: dict = {"checked_at": time.time(), "reachable": False, "reason": None, "host": host}
+    for attempt in range(max(1, attempts)):
+        try:
+            response = httpx.get(
+                f"{url.rstrip('/')}/rest/v1/profiles?select=id&limit=1",
+                headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                timeout=timeout,
+            )
+            if response.status_code == 429:
+                state["reason"] = "project_paused"
+            elif response.status_code >= 500:
+                state["reason"] = "server_error"
+            else:
+                state["reachable"] = True
+                state["reason"] = None
+            break
+        except Exception as exc:
+            state["reason"] = _classify(exc)
+            state["detail"] = str(exc)
+            if attempt + 1 < attempts:
+                time.sleep(0.4)
+
+    with _probe_lock:
+        _probe_state.update(state)
+    return dict(state)
+
+
+def _client():
+    global _supabase, _ready
+    if _supabase is not None:
+        return _supabase
+    url, key = _config()
     if not url or not key:
         print("Supabase not configured (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)")
         _ready = False
@@ -32,14 +105,36 @@ def _client():
         return None
 
 
-def is_ready() -> bool:
+def is_configured() -> bool:
+    """True when a Supabase client can be built (no network access involved)."""
     return _client() is not None
+
+
+def is_ready() -> bool:
+    """True only when Supabase is configured AND actually reachable.
+
+    create_client() never touches the network, so checking for a client alone
+    reported "ready" even for a paused (DNS-less) project. This costs a probe
+    round-trip, so it is meant for health/status reporting rather than hot paths.
+    """
+    if _client() is None:
+        return False
+    return bool(probe()["reachable"])
 
 
 def health_check() -> dict:
     sb = _client()
+    state = probe()
     if not sb:
         return {"ready": False, "tables": {}, "message": "Supabase client is not configured"}
+    if not state["reachable"]:
+        return {
+            "ready": False,
+            "tables": {},
+            "host": state["host"],
+            "reason": state["reason"],
+            "message": f"Supabase is unreachable ({state['reason']})",
+        }
     tables = {}
     for table in (
         "profiles",
@@ -56,7 +151,7 @@ def health_check() -> dict:
         except Exception as e:
             tables[table] = False
             print(f"Supabase health check failed for {table}: {e}")
-    return {"ready": all(tables.values()), "tables": tables}
+    return {"ready": all(tables.values()), "tables": tables, "host": state["host"], "reason": state["reason"]}
 
 
 def get_profile(phone: str) -> Optional[dict]:

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Volume2, Phone, ShieldCheck, ArrowRight, CheckCircle2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { sendOtp, verifyRegistrationOtp, registerUser } from '../services/api';
+import { sendOtp, verifyRegistrationOtp, registerUser, apiErrorMessage } from '../services/api';
 import DemoNumberBanner, { DEMO_FARMER_PHONE } from '../components/DemoNumberBanner';
 
 export default function FarmerRegister() {
@@ -207,7 +207,7 @@ export default function FarmerRegister() {
     try {
       const res = await sendOtp(phone);
       if (!res.success) {
-        setOtpError(res.message || t('regErrSendOtp'));
+        setOtpError(apiErrorMessage(res, t, 'regErrSendOtp'));
         return;
       }
 
@@ -240,7 +240,7 @@ export default function FarmerRegister() {
     try {
       const verifyRes = await verifyRegistrationOtp(phone, otp);
       if (!verifyRes.success) {
-        setOtpError(verifyRes.message || t('regErrVerifyOtp'));
+        setOtpError(apiErrorMessage(verifyRes, t, 'regErrVerifyOtp'));
         return;
       }
 
@@ -261,7 +261,7 @@ export default function FarmerRegister() {
 
       const regRes = await registerUser(userData);
       if (!regRes.success) {
-        setOtpError(regRes.message || t('regErrRegFailed'));
+        setOtpError(apiErrorMessage(regRes, t, 'regErrRegFailed'));
         return;
       }
 

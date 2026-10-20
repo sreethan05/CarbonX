@@ -10,6 +10,24 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * Pick the message to show for a failed API call.
+ *
+ * `t` is the i18n translate function. Infrastructure failures (the Supabase
+ * project being paused, say) are tagged with a `code` by the backend so they
+ * can be shown in the farmer's own language instead of an English server
+ * string.
+ */
+export function apiErrorMessage(res, t, fallbackKey) {
+  if (res?.code === 'db_unavailable') {
+    return t('errDbUnavailable');
+  }
+  if (res?.message) {
+    return res.message;
+  }
+  return fallbackKey ? t(fallbackKey) : '';
+}
+
 function authHeaders() {
   const token = localStorage.getItem('carbonx_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -22,6 +40,51 @@ async function _checkAuth(res) {
   return res;
 }
 
+/**
+ * Normalize a backend response into a consistent shape.
+ *
+ * FastAPI answers raised HTTPExceptions with `{ detail: "..." }` instead of
+ * `{ success: false, message: "..." }`, so callers used to fall back to a
+ * generic message. This lifts `detail` into `message` and tags the payload
+ * with a machine-readable `code` so the UI can translate it.
+ */
+function _normalize(payload) {
+  const body = payload && typeof payload === 'object' ? { ...payload } : {};
+  const detail = body.detail;
+  if (!body.message) {
+    if (typeof detail === 'string') {
+      body.message = detail;
+    } else if (detail && typeof detail === 'object') {
+      body.message = detail.message || detail.detail || '';
+      if (!body.code && detail.code) body.code = detail.code;
+    }
+  }
+  if (body.success === false && !body.code) {
+    body.code = 'error';
+  }
+  return body;
+}
+
+async function _json(res) {
+  let payload = null;
+  try {
+    payload = await res.json();
+  } catch {
+    payload = null;
+  }
+  const body = _normalize(payload);
+  if (body.success === undefined) {
+    // No explicit `success` field: trust the HTTP status (a 503 carrying only
+    // `detail` must not be mistaken for a successful call).
+    body.success = res.ok;
+  }
+  if (!body.success && !body.message) {
+    body.message = res.statusText || 'Unexpected server response';
+    body.code = body.code || 'error';
+  }
+  return body;
+}
+
 async function post(url, body) {
   const res = await fetch(url, {
     method: 'POST',
@@ -29,7 +92,7 @@ async function post(url, body) {
     body: JSON.stringify(body),
   });
   await _checkAuth(res);
-  return res.json();
+  return _json(res);
 }
 
 async function patch(url, body) {
@@ -39,13 +102,13 @@ async function patch(url, body) {
     body: JSON.stringify(body),
   });
   await _checkAuth(res);
-  return res.json();
+  return _json(res);
 }
 
 async function get(url) {
   const res = await fetch(url, { headers: authHeaders() });
   await _checkAuth(res);
-  return res.json();
+  return _json(res);
 }
 
 // ── Auth ──

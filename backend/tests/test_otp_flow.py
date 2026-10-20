@@ -2,6 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 from app import redis_store
@@ -58,6 +59,7 @@ class TestOtpFlow(unittest.TestCase):
             patch("app.main.generate_otp", return_value="222222"),
             patch("app.main.send_phone_otp", return_value=(False, "provider rejected")),
             patch("app.main._sms_ready", return_value=True),
+            patch("app.main._otp_dev_fallback_enabled", return_value=False),
         ):
             send_res = self.client.post("/send-otp", json={"phone": self.phone})
 
@@ -69,6 +71,35 @@ class TestOtpFlow(unittest.TestCase):
             json={"phone": self.phone, "otp": "111111"},
         )
         self.assertFalse(verify_res.json().get("success"))
+
+    def test_provider_failure_falls_back_to_local_otp_in_dev(self):
+        """With the dev fallback on, a failed SMS still yields a usable OTP."""
+        with (
+            patch("app.main.generate_otp", return_value="333333"),
+            patch("app.main.send_phone_otp", return_value=(False, "provider rejected")),
+            patch("app.main._sms_ready", return_value=True),
+            patch("app.main._otp_dev_fallback_enabled", return_value=True),
+        ):
+            send_res = self.client.post("/send-otp", json={"phone": self.phone})
+
+        self.assertEqual(send_res.status_code, 200)
+        self.assertTrue(send_res.json().get("success"))
+        self.assertEqual(send_res.json().get("dev_otp"), "333333")
+
+    def test_database_outage_returns_friendly_error_not_raw_errno(self):
+        """A paused/unreachable Supabase must not leak "[Errno -2] ..." to the UI."""
+        with patch(
+            "app.main.db.get_profile",
+            side_effect=httpx.ConnectError("[Errno -2] Name or service not known"),
+        ):
+            res = self.client.post("/login/send-otp", json={"phone": self.phone})
+
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertFalse(body.get("success"))
+        self.assertEqual(body.get("code"), "db_unavailable")
+        self.assertNotIn("Errno", body.get("message", ""))
+        self.assertNotIn("Name or service not known", body.get("message", ""))
 
 
 if __name__ == "__main__":
