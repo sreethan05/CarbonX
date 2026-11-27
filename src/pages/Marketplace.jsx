@@ -4,6 +4,70 @@ import { Search, MapPin, Calendar, ShoppingCart, CheckCircle2, ChevronRight, Plu
 import { useAuth } from '../context/AuthContext';
 import { getMarketplaceListings, buyCredits } from '../services/api';
 
+const defaultListings = [
+  {
+    id: 'LST-001',
+    crop: 'Paddy',
+    farmer: 'Marketplace Farmer',
+    location: 'Chevella, Rangareddy',
+    available: '1.14',
+    carbonScore: '0.47',
+    bioScore: '0.67',
+    price: '550',
+    status: 'Active',
+    badge: 'REGISTRY'
+  },
+  {
+    id: 'LST-002',
+    crop: 'Rice',
+    farmer: 'Test Farmer',
+    location: 'Moinabad, Rangareddy',
+    available: '96',
+    carbonScore: '0.82',
+    bioScore: '0.75',
+    price: '550',
+    status: 'Active',
+    badge: 'REGISTRY_DOC'
+  },
+  {
+    id: 'LST-003',
+    crop: 'Cotton',
+    farmer: 'Venkat Rao',
+    location: 'Pochampally, Yadadri Bhuvanagiri',
+    available: '12.5',
+    carbonScore: '0.78',
+    bioScore: '0.84',
+    price: '340',
+    status: 'Active',
+    badge: 'REGISTRY'
+  },
+  {
+    id: 'LST-004',
+    crop: 'Maize',
+    farmer: 'B. Lakshmi',
+    location: 'Mothkur, Yadadri Bhuvanagiri',
+    available: '58.0',
+    carbonScore: '0.71',
+    bioScore: '0.72',
+    price: '320',
+    status: 'Active',
+    badge: 'REGISTRY_DOC'
+  },
+  {
+    id: 'LST-005',
+    crop: 'Paddy',
+    farmer: 'M. Narsimha',
+    location: 'Bonakal, Khammam, Telangana',
+    available: '38.0',
+    carbonScore: '0.65',
+    bioScore: '0.68',
+    price: '310',
+    status: 'Active',
+    badge: 'DOCUMENT'
+  }
+];
+
+
 export default function Marketplace() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -18,87 +82,24 @@ export default function Marketplace() {
   const [checkoutCertId, setCheckoutCertId] = useState(null);
   const [checkoutError, setCheckoutError] = useState('');
 
-  const defaultListings = [
-    {
-      id: 'LST-001',
-      crop: 'Paddy',
-      farmer: 'Marketplace Farmer',
-      location: 'Chevella, Rangareddy',
-      available: '1.14',
-      carbonScore: '0.47',
-      bioScore: '0.67',
-      price: '550',
-      status: 'Active',
-      badge: 'REGISTRY'
-    },
-    {
-      id: 'LST-002',
-      crop: 'Rice',
-      farmer: 'Test Farmer',
-      location: 'Moinabad, Rangareddy',
-      available: '96',
-      carbonScore: '0.82',
-      bioScore: '0.75',
-      price: '550',
-      status: 'Active',
-      badge: 'REGISTRY_DOC'
-    },
-    {
-      id: 'LST-003',
-      crop: 'Cotton',
-      farmer: 'Venkat Rao',
-      location: 'Pochampally, Yadadri Bhuvanagiri',
-      available: '12.5',
-      carbonScore: '0.78',
-      bioScore: '0.84',
-      price: '340',
-      status: 'Active',
-      badge: 'REGISTRY'
-    },
-    {
-      id: 'LST-004',
-      crop: 'Maize',
-      farmer: 'B. Lakshmi',
-      location: 'Mothkur, Yadadri Bhuvanagiri',
-      available: '58.0',
-      carbonScore: '0.71',
-      bioScore: '0.72',
-      price: '320',
-      status: 'Active',
-      badge: 'REGISTRY_DOC'
-    },
-    {
-      id: 'LST-005',
-      crop: 'Paddy',
-      farmer: 'M. Narsimha',
-      location: 'Bonakal, Khammam, Telangana',
-      available: '38.0',
-      carbonScore: '0.65',
-      bioScore: '0.68',
-      price: '310',
-      status: 'Active',
-      badge: 'DOCUMENT'
-    }
-  ];
-
-  const [listings, setListings] = useState(defaultListings);
-  const [dataSource, setDataSource] = useState('fallback');
+  const [listings, setListings] = useState([]);
+  const [dataSource, setDataSource] = useState(null);
 
   useEffect(() => {
     async function loadListings() {
       setIsLoading(true);
       try {
         const data = await getMarketplaceListings({ limit: 50 });
-        if (data && data.success && Array.isArray(data.listings) && data.listings.length > 0) {
+        if (data && data.success && Array.isArray(data.listings)) {
           const mapped = data.listings.map((l, idx) => ({
             id: l.id || `LST-DB-${idx}`,
             crop: l.crop || 'Paddy',
             farmer: l.farmer_name || 'Marketplace Farmer',
             location: l.location || 'Telangana',
-            available: (l.total_credits || l.carbon_credits || 1.0).toString(),
-            carbonScore: (l.carbon_credits || 0.5).toString(),
-            bioScore: (l.biodiversity_credits || 0.5).toString(),
-            price: (l.price_per_credit || 340).toString(),
+            available: (l.total_credits ?? 0).toString(),
+            carbonScore: (l.carbon_credits ?? 0).toString(),
+            bioScore: (l.biodiversity_credits ?? 0).toString(),
+            price: (l.price_per_credit ?? 340).toString(),
             status: l.status || 'Active',
             badge: l.badge || (l.size_label === 'Large' ? 'REGISTRY' : l.size_label === 'Medium' ? 'REGISTRY_DOC' : 'DOCUMENT'),
             imageUrl: l.image_url
@@ -107,9 +108,11 @@ export default function Marketplace() {
           setDataSource(data.source || 'live_db');
           return;
         }
+        setListings(defaultListings);
         setDataSource('fallback');
       } catch (err) {
         console.warn('Could not fetch remote listings, using defaults', err);
+        setListings(defaultListings);
         setDataSource('fallback');
       } finally {
         setIsLoading(false);
@@ -118,12 +121,13 @@ export default function Marketplace() {
     loadListings();
   }, []);
 
-  const getQuantity = (id) => quantities[id] || 1;
-
-  const updateQuantity = (id, delta) => {
-    const current = getQuantity(id);
-    const updated = Math.max(1, current + delta);
-    setQuantities({ ...quantities, [id]: updated });
+  const getQuantity = (item) => Math.min(quantities[item.id] ?? 1, Number(item.available));
+  const updateQuantity = (item, delta) => {
+    const available = Number(item.available);
+    setQuantities(previous => ({
+      ...previous,
+      [item.id]: Math.min(available, Math.max(1, Math.round(((previous[item.id] ?? 1) + delta) * 10000) / 10000)),
+    }));
   };
 
   const filteredListings = listings.filter(item => {
@@ -156,8 +160,8 @@ export default function Marketplace() {
     setIsProcessing(true);
     setCheckoutError('');
     try {
-      const qty = getQuantity(checkoutModalItem.id);
-      const price = parseFloat(checkoutModalItem.price) || 340;
+      const qty = getQuantity(checkoutModalItem);
+      const price = Number(checkoutModalItem.price);
       const data = await buyCredits({
         listing_id: checkoutModalItem.id,
         credits: qty,
@@ -173,7 +177,7 @@ export default function Marketplace() {
       throw new Error((data && data.message) || 'Purchase failed');
     } catch (err) {
       console.warn('Purchase API unavailable', err);
-      if (import.meta.env.DEV) {
+      if (import.meta.env.DEV && dataSource === 'fallback') {
         // Demo mode (dev builds only): simulated checkout
         setCheckoutCertId('CX-2026-CERT-00123');
         finishPurchase('CX-2026-CERT-00123');
@@ -237,8 +241,13 @@ export default function Marketplace() {
 
         {/* Listing Cards Stack */}
         <div className="space-y-4">
+          {dataSource === null ? (
+            <p>Loading marketplace listings…</p>
+          ) : filteredListings.length === 0 && (
+            <p>{searchQuery ? 'No listings match your search.' : 'No credits are currently listed for sale.'}</p>
+          )}
           {filteredListings.map(item => {
-            const qty = getQuantity(item.id);
+            const qty = getQuantity(item);
             return (
               <div
                 key={item.id}
@@ -286,7 +295,8 @@ export default function Marketplace() {
                   <div className="flex items-center border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 gap-3">
                     <button
                       type="button"
-                      onClick={() => updateQuantity(item.id, -1)}
+                      disabled={qty <= 1}
+                      onClick={() => updateQuantity(item, -1)}
                       className="p-1 hover:bg-slate-200 rounded text-slate-700 transition-colors"
                     >
                       <Minus className="w-3.5 h-3.5" />
@@ -298,7 +308,8 @@ export default function Marketplace() {
 
                     <button
                       type="button"
-                      onClick={() => updateQuantity(item.id, 1)}
+                      disabled={qty >= Number(item.available)}
+                      onClick={() => updateQuantity(item, 1)}
                       className="p-1 hover:bg-slate-200 rounded text-slate-700 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -307,6 +318,7 @@ export default function Marketplace() {
 
                   <button
                     type="button"
+                    disabled={!(qty > 0)}
                     onClick={() => handleBuyClick(item)}
                     className="px-5 py-2.5 bg-[#1B4332] hover:bg-[#2D6A4F] text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5"
                   >
@@ -354,12 +366,12 @@ export default function Marketplace() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 font-semibold">Selected Volume:</span>
-                      <span className="font-mono font-bold text-emerald-800">{getQuantity(checkoutModalItem.id)} MT</span>
+                      <span className="font-mono font-bold text-emerald-800">{getQuantity(checkoutModalItem)} MT</span>
                     </div>
                     <div className="flex justify-between border-t border-slate-200 pt-2">
                       <span className="text-slate-500 font-semibold">Total Escrow Value:</span>
                       <span className="font-mono font-bold text-slate-900">
-                        ₹{(getQuantity(checkoutModalItem.id) * parseFloat(checkoutModalItem.price)).toLocaleString('en-IN')}
+                        ₹{(getQuantity(checkoutModalItem) * parseFloat(checkoutModalItem.price)).toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
