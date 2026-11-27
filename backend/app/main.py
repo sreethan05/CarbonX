@@ -1725,9 +1725,11 @@ def buy_marketplace_credits(data: MarketplaceBuyModel, current_user: Optional[di
         available = float(listing.get("total_credits") or 0)
         if available <= 0:
             return {"success": False, "message": "This listing has no purchasable credits left"}
-        credits = round(min(float(data.credits or available), available), 4)
-        if credits <= 0:
+        credits = round(data.credits, 4)
+        if not credits > 0:
             return {"success": False, "message": "Credit quantity must be greater than zero"}
+        if credits > available:
+            return {"success": False, "message": "Requested quantity exceeds available credits"}
 
         unit_price = float(listing.get("price_per_credit") or data.unit_price or 340)
         gross = round(credits * unit_price, 2)
@@ -1741,7 +1743,15 @@ def buy_marketplace_credits(data: MarketplaceBuyModel, current_user: Optional[di
             updates["total_credits"] = round(available - credits, 4)
         else:
             updates["status"] = "Sold"
-        sb.table("marketplace_listings").update(updates).eq("id", data.listing_id).execute()
+        purchase = (sb.table("marketplace_listings").update(updates)
+                    .eq("id", data.listing_id).eq("total_credits", listing["total_credits"]))
+        if listing.get("status") is None:
+            purchase = purchase.is_("status", "null")
+        else:
+            purchase = purchase.eq("status", listing["status"])
+        if not purchase.execute().data:
+            return {"success": False, "message": "Listing changed during checkout. Refresh and try again."}
+
 
         buyer = data.buyer_name or (current_user or {}).get("name") or "Corporate Buyer"
         return {
